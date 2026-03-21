@@ -47,7 +47,7 @@ Agent A                    File System                   Agent B
 intercom/
 ├── CDD.md              # Methodology reference
 ├── CLAUDE.md           # This file
-├── quick-start.md      # Setup instructions (also in specs/setup.md)
+├── quick-start.md      # Setup and configuration instructions
 ├── bin/
 │   └── install         # Installer: registers intercom as global MCP server
 ├── specs/

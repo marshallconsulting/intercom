@@ -80,7 +80,7 @@ hello
 
 ### Manual setup
 
-If you prefer not to use the installer, see [specs/setup.md](specs/setup.md) for instructions on adding the MCP config entry by hand (global or per-repo).
+If you prefer not to use the installer, see [quick-start.md](quick-start.md) for manual global and per-repo configuration options.
 
 ## Use Cases
 
