@@ -155,8 +155,14 @@ async function sendMessage(targetId: string, message: string) {
 
   await writeFile(join(inbox, `${msgId}.json`), JSON.stringify(msg, null, 2))
 
+  const status = await getAgentStatus(targetId)
+  const text =
+    status === 'online'
+      ? `Sent to ${targetId}`
+      : `Sent to ${targetId}. Agent appears offline -- message queued in their inbox.`
+
   return {
-    content: [{ type: 'text' as const, text: `Sent to ${targetId}` }],
+    content: [{ type: 'text' as const, text }],
   }
 }
 
