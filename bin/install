@@ -1,71 +1,82 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Resolve repo root from this script's location
+# Intercom installer
+# Registers intercom as a global MCP server in ~/.claude/.mcp.json
+# so every Claude Code session has messaging access without per-repo setup.
+
+# --- Resolve repo root from this script's location ---
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 SERVER_PATH="$REPO_ROOT/source/intercom.ts"
-MCP_CONFIG="$HOME/.claude/.mcp.json"
 
-# Check dependencies
-missing=()
-command -v jq >/dev/null 2>&1 || missing+=("jq")
-command -v bun >/dev/null 2>&1 || missing+=("bun")
+# --- Check prerequisites ---
 
-if [[ ${#missing[@]} -gt 0 ]]; then
-    echo "Missing required tools: ${missing[*]}"
-    echo ""
-    for tool in "${missing[@]}"; do
-        case "$tool" in
-            jq)  echo "  Install jq:  https://jqlang.github.io/jq/download/" ;;
-            bun) echo "  Install bun: https://bun.sh/" ;;
-        esac
-    done
-    exit 1
+if ! command -v jq &>/dev/null; then
+  echo "Error: jq is required but not installed."
+  echo "  macOS:  brew install jq"
+  echo "  Linux:  sudo apt install jq"
+  exit 1
 fi
 
-# Verify the server file exists
-if [[ ! -f "$SERVER_PATH" ]]; then
-    echo "Error: Server not found at $SERVER_PATH"
-    echo "Make sure you're running this from the intercom repo."
-    exit 1
+if ! command -v bun &>/dev/null; then
+  echo "Error: bun is required but not installed."
+  echo "  Install: curl -fsSL https://bun.sh/install | bash"
+  exit 1
 fi
 
-# Install dependencies
+if [ ! -f "$SERVER_PATH" ]; then
+  echo "Error: intercom server not found at $SERVER_PATH"
+  echo "  Are you running this from the right repo?"
+  exit 1
+fi
+
+# --- Install dependencies ---
+
 echo "Installing dependencies..."
 (cd "$REPO_ROOT/source" && bun install --silent)
 
-# Ensure ~/.claude/ directory exists
-mkdir -p "$(dirname "$MCP_CONFIG")"
+# --- Configure global MCP server ---
 
-# Create config file if it doesn't exist
-if [[ ! -f "$MCP_CONFIG" ]]; then
-    echo '{"mcpServers":{}}' > "$MCP_CONFIG"
-    echo "Created $MCP_CONFIG"
+MCP_CONFIG="$HOME/.claude/.mcp.json"
+
+# Create the config file if it doesn't exist
+if [ ! -f "$MCP_CONFIG" ]; then
+  mkdir -p "$(dirname "$MCP_CONFIG")"
+  echo '{"mcpServers":{}}' > "$MCP_CONFIG"
+  echo "Created $MCP_CONFIG"
 fi
 
-# Add or update the intercom entry
-UPDATED=$(jq --arg path "$SERVER_PATH" \
-    '.mcpServers.intercom = {
-        "command": "bun",
-        "args": ["run", $path],
-        "type": "stdio"
-    }' "$MCP_CONFIG")
+# Build the intercom server entry
+INTERCOM_ENTRY=$(jq -n \
+  --arg server "$SERVER_PATH" \
+  '{
+    command: "bun",
+    args: ["run", $server],
+    type: "stdio"
+  }')
 
-echo "$UPDATED" > "$MCP_CONFIG"
+# Add or update the intercom entry, preserving all other servers
+jq --argjson entry "$INTERCOM_ENTRY" \
+  '.mcpServers.intercom = $entry' \
+  "$MCP_CONFIG" > "$MCP_CONFIG.tmp" && mv "$MCP_CONFIG.tmp" "$MCP_CONFIG"
 
 echo ""
-echo "Intercom installed."
+echo "Done. Intercom is configured as a global MCP server."
 echo ""
 echo "  Config:  $MCP_CONFIG"
 echo "  Server:  $SERVER_PATH"
 echo ""
-echo "Every new Claude Code session now has intercom available."
+echo "Every new Claude Code session now has access to intercom tools"
+echo "(send, broadcast, list_agents)."
 echo ""
-echo "Agent ID defaults to \"unknown\". To set a specific identity,"
-echo "export CLAUDE_AGENT_ID before starting Claude Code:"
+echo "To set your agent ID, export CLAUDE_AGENT_ID before launching Claude Code:"
 echo ""
 echo "  export CLAUDE_AGENT_ID=my-agent"
+echo "  claude"
 echo ""
-echo "If you have per-repo .mcp.json entries for intercom in other"
-echo "projects, you can remove them. The global config handles it now."
+echo "Without it, the agent defaults to \"unknown\" (fine for casual use)."
+echo ""
+echo "If you have per-repo .mcp.json entries for intercom in other projects,"
+echo "you can remove them. The global config handles it now."
