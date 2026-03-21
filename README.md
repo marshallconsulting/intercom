@@ -53,9 +53,18 @@ cd intercom
 bin/install
 ```
 
-The installer adds intercom to your global Claude Code config. Every new session has messaging available. See [specs/setup.md](specs/setup.md) for manual setup and configuration options.
+The installer registers intercom as a global MCP server in `~/.claude/.mcp.json`. Every Claude Code session gets messaging access automatically.
 
-#### Test It
+### 2. Set your agent ID (optional)
+
+```bash
+export CLAUDE_AGENT_ID=team-cto
+claude
+```
+
+Without this, the agent defaults to `"unknown"`, which is fine for casual use.
+
+### 3. Test it
 
 Launch two agents in separate terminals with different `CLAUDE_AGENT_ID` values. In Agent A:
 
@@ -69,7 +78,11 @@ hello
 </channel>
 ```
 
-### Use Cases
+### Manual setup
+
+If you prefer not to use the installer, see [quick-start.md](quick-start.md) for manual global and per-repo configuration options.
+
+## Use Cases
 
 **Specialist coordination.** Run a CTO, CMO, and CFO agent. The CTO asks the CMO for a pipeline update. The CMO replies with numbers. The CTO synthesizes and reports back. All without human routing.
 
