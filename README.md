@@ -58,7 +58,7 @@ The installer registers intercom as a global MCP server in `~/.claude/.mcp.json`
 ### 2. Set your agent ID (optional)
 
 ```bash
-export CLAUDE_AGENT_ID=team-cto
+export INTERCOM_AGENT_ID=team-cto
 claude
 ```
 
@@ -80,7 +80,7 @@ hello
 
 ### Manual setup
 
-If you prefer not to use the installer, see [quick-start.md](quick-start.md) for manual global and per-repo configuration options.
+If you prefer not to use the installer, see [intercom-quick-start.md](intercom-quick-start.md) for manual global and per-repo configuration options.
 
 ## Use Cases
 

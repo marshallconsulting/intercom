@@ -45,33 +45,38 @@ Agent A                    File System                   Agent B
 
 ```
 intercom/
-├── CDD.md              # Methodology reference
-├── CLAUDE.md           # This file
-├── quick-start.md      # Setup and configuration instructions
+├── CDD.md                # Methodology reference
+├── CLAUDE.md             # This file
+├── cdd-quick-start.md    # How to adopt CDD in another repo
+├── intercom-quick-start.md # Setup and configuration for intercom
 ├── bin/
-│   └── install         # Installer: registers intercom as global MCP server
+│   └── install           # Installer: registers intercom as global MCP server
 ├── specs/
-│   ├── protocol.md     # Message format, delivery semantics
-│   ├── setup.md        # Installation, configuration, agent ID
-│   └── sandbox/        # Half-baked spec ideas
+│   ├── protocol.md       # Message format, delivery semantics
+│   └── sandbox/          # Half-baked spec ideas
 ├── workflow/
-│   ├── proposals/      # Features waiting to be built
+│   ├── proposals/        # Features waiting to be built
+│   │   └── accepted/     # Approved proposals with date prefix
 │   └── plans/
-│       └── archived/   # How existing features were built
+│       ├── active/       # Currently being executed (hands off)
+│       └── archived/     # How existing features were built
 ├── source/
-│   ├── intercom.ts     # The MCP server
+│   ├── intercom.ts       # The MCP server
 │   ├── package.json
 │   └── test/
 ├── skills/
-│   └── cdd/            # CDD pipeline skills
+│   └── cdd/              # CDD pipeline skills (source of truth)
 │       ├── accept-proposal/
 │       ├── audit-plan/
 │       ├── execute-plan/
-│       └── reconcile/
-├── research/           # Distilled external knowledge
-├── transcripts/        # Cleaned design session records
-├── docs/               # GitHub Pages site (public-facing content)
-└── experiments/        # POCs and throwaway explorations
+│       ├── reconcile/
+│       ├── mutate/
+│       └── nightshift/
+├── playbook/             # Coding patterns and guardrails
+├── research/             # Distilled external knowledge
+├── transcripts/          # Cleaned design session records
+├── docs/                 # GitHub Pages site (public-facing content)
+└── experiments/          # POCs and throwaway explorations
 ```
 
 ## Working in This Repo
@@ -84,7 +89,7 @@ bin/install
 cd source && bun install
 
 # Run the server (normally launched by Claude Code, not manually)
-CLAUDE_AGENT_ID=my-agent bun run source/intercom.ts
+INTERCOM_AGENT_ID=my-agent bun run source/intercom.ts
 
 # Run tests
 cd source && bun test
@@ -92,8 +97,12 @@ cd source && bun test
 
 ## Key Concepts
 
-- **Agent ID** — Unique identifier (e.g., `team-cto`, `project-a-builder`). Set via `CLAUDE_AGENT_ID` env var.
+- **Agent ID** — Unique identifier (e.g., `team-cto`, `project-a-builder`). Set via `INTERCOM_AGENT_ID` env var (also accepts `CLAUDE_AGENT_ID`).
 - **Inbox** — Per-agent directory at `~/.claude/intercom/<agent-id>/inbox/`. Messages are JSON files.
 - **Registry** — Agent writes `info.json` on startup. `list_agents` reads all registrations.
 - **Channel delivery** — Messages arrive as MCP channel notifications, rendered as `<channel>` tags.
 - **Processed** — After delivery, messages move from `inbox/` to `processed/` for history.
+
+## Internal Notes
+
+If `INTERNAL.md` exists at the repo root, read it. It contains private context (credentials, environment details, internal decisions) that shouldn't be checked into the public repo.

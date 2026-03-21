@@ -16,5 +16,6 @@ GitHub Pages site. Drop HTML, markdown, or Jekyll content here for easy hosting 
 | Content | Location |
 |---------|----------|
 | Specs and domain knowledge | `specs/` |
-| Setup and install instructions | `quick-start.md` (repo root) |
+| Intercom setup and install | `intercom-quick-start.md` (repo root) |
+| CDD adoption guide | `cdd-quick-start.md` (repo root) |
 | Anything you want publicly hosted | `docs/` (this folder) |
