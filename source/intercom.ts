@@ -190,10 +190,15 @@ async function listAgents() {
     }
   }
 
-  const lines = agents.map((a) => {
-    const status = a.agent_id === AGENT_ID ? '(this agent)' : ''
-    return `  ${a.agent_id} ${status}`.trimEnd()
-  })
+  const lines: string[] = []
+  for (const a of agents) {
+    if (a.agent_id === AGENT_ID) {
+      lines.push(`  ${a.agent_id} (this agent)`)
+    } else {
+      const status = await getAgentStatus(a.agent_id)
+      lines.push(`  ${a.agent_id} (${status})`)
+    }
+  }
 
   return {
     content: [
@@ -230,6 +235,18 @@ async function getRegisteredAgents(): Promise<AgentInfo[]> {
     }
   }
   return agents
+}
+
+async function getAgentStatus(
+  agentId: string,
+): Promise<'online' | 'offline' | 'unknown'> {
+  const heartbeatPath = join(INTERCOM_DIR, agentId, 'heartbeat.json')
+  try {
+    const data = JSON.parse(await readFile(heartbeatPath, 'utf-8'))
+    return Date.now() - data.ts < HEARTBEAT_STALE_MS ? 'online' : 'offline'
+  } catch {
+    return 'unknown'
+  }
 }
 
 async function register() {
