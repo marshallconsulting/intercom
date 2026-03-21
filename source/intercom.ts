@@ -1,4 +1,5 @@
 #!/usr/bin/env bun
+
 /**
  * Intercom — Agent-to-agent messaging for Claude Code
  *
@@ -11,19 +12,28 @@
  * https://github.com/marshallconsulting/intercom
  */
 
+import { existsSync } from 'node:fs'
+import {
+  mkdir,
+  readdir,
+  readFile,
+  rename,
+  unlink,
+  writeFile,
+} from 'node:fs/promises'
+import { homedir } from 'node:os'
+import { join } from 'node:path'
 import { Server } from '@modelcontextprotocol/sdk/server/index.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import {
-  ListToolsRequestSchema,
   CallToolRequestSchema,
+  ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js'
-import { readdir, readFile, mkdir, writeFile, rename, unlink } from 'fs/promises'
-import { join } from 'path'
-import { homedir } from 'os'
-import { existsSync } from 'fs'
 
-const INTERCOM_DIR = join(homedir(), '.claude', 'intercom')
-const AGENT_ID = process.env.CLAUDE_AGENT_ID || process.env.AGENT_ID || 'unknown'
+const INTERCOM_DIR =
+  process.env.INTERCOM_DIR || join(homedir(), '.claude', 'intercom')
+const AGENT_ID =
+  process.env.CLAUDE_AGENT_ID || process.env.AGENT_ID || 'unknown'
 const POLL_INTERVAL_MS = 2000
 
 // --- MCP Server Setup ---
@@ -53,7 +63,10 @@ mcp.setRequestHandler(ListToolsRequestSchema, async () => ({
       inputSchema: {
         type: 'object' as const,
         properties: {
-          to: { type: 'string', description: 'Target agent ID (e.g. team-cto)' },
+          to: {
+            type: 'string',
+            description: 'Target agent ID (e.g. team-cto)',
+          },
           message: { type: 'string', description: 'Message to send' },
         },
         required: ['to', 'message'],
@@ -152,7 +165,9 @@ async function listAgents() {
   const agents = await getRegisteredAgents()
 
   if (!agents.length) {
-    return { content: [{ type: 'text' as const, text: 'No agents registered' }] }
+    return {
+      content: [{ type: 'text' as const, text: 'No agents registered' }],
+    }
   }
 
   const lines = agents.map((a) => {
@@ -161,7 +176,12 @@ async function listAgents() {
   })
 
   return {
-    content: [{ type: 'text' as const, text: `Registered agents:\n${lines.join('\n')}` }],
+    content: [
+      {
+        type: 'text' as const,
+        text: `Registered agents:\n${lines.join('\n')}`,
+      },
+    ],
   }
 }
 
@@ -218,7 +238,9 @@ async function pollInbox() {
       for (const file of jsonFiles) {
         const filePath = join(inbox, file)
         try {
-          const msg: IntercomMessage = JSON.parse(await readFile(filePath, 'utf-8'))
+          const msg: IntercomMessage = JSON.parse(
+            await readFile(filePath, 'utf-8'),
+          )
 
           // Deliver as channel notification
           await mcp.notification({
@@ -236,9 +258,11 @@ async function pollInbox() {
 
           // Move to processed
           await rename(filePath, join(processed, file))
-        } catch (e) {
+        } catch (_e) {
           // If we can't process a message, delete it to avoid infinite loops
-          try { await unlink(filePath) } catch {}
+          try {
+            await unlink(filePath)
+          } catch {}
         }
       }
     } catch {
