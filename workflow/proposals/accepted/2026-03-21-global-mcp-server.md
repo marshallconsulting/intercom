@@ -1,6 +1,6 @@
 # Proposal: Global MCP Server Configuration
 
-**Status:** Draft
+**Status:** Accepted
 
 ## Problem
 
