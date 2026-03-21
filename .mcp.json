@@ -1,9 +1,0 @@
-{
-  "mcpServers": {
-    "intercom": {
-      "command": "bun",
-      "args": ["run", "/Users/doug/data/intercom/source/intercom.ts"],
-      "type": "stdio"
-    }
-  }
-}
