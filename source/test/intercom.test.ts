@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
+import { existsSync } from 'node:fs'
 import {
   mkdir,
   mkdtemp,
@@ -507,4 +508,175 @@ describe('error handling', () => {
     const output = await server.readAllOutput(100)
     expect(output).toContain('valid message')
   }, 10000)
+})
+
+describe('heartbeat', () => {
+  let tmpDir: string
+  let server: ReturnType<typeof spawnServer>
+
+  beforeAll(async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), 'intercom-test-'))
+  })
+
+  afterAll(async () => {
+    server.kill()
+    await rm(tmpDir, { recursive: true, force: true })
+  })
+
+  test('writes heartbeat.json during polling', async () => {
+    const agentId = 'heartbeat-agent'
+
+    server = spawnServer(tmpDir, agentId)
+    await initializeServer(server)
+
+    // Wait for at least one poll cycle (2s) plus buffer
+    await Bun.sleep(3500)
+
+    const heartbeatPath = join(tmpDir, agentId, 'heartbeat.json')
+    expect(existsSync(heartbeatPath)).toBe(true)
+
+    const data = JSON.parse(await readFile(heartbeatPath, 'utf-8'))
+    expect(data.ts).toBeDefined()
+    expect(typeof data.ts).toBe('number')
+
+    // Heartbeat should be recent (within the last 5 seconds)
+    expect(Date.now() - data.ts).toBeLessThan(5000)
+  }, 10000)
+})
+
+describe('list_agents with heartbeat status', () => {
+  let tmpDir: string
+  let server: ReturnType<typeof spawnServer>
+
+  beforeAll(async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), 'intercom-test-'))
+
+    // Register the running agent and another agent
+    await registerAgent(tmpDir, 'online-agent')
+    await registerAgent(tmpDir, 'stale-agent')
+    await registerAgent(tmpDir, 'no-heartbeat-agent')
+
+    // Write a fresh heartbeat for online-agent (will be overwritten by server)
+    await mkdir(join(tmpDir, 'online-agent'), { recursive: true })
+    await writeFile(
+      join(tmpDir, 'online-agent', 'heartbeat.json'),
+      JSON.stringify({ ts: Date.now() }),
+    )
+
+    // Write a stale heartbeat for stale-agent (20 seconds old)
+    await mkdir(join(tmpDir, 'stale-agent'), { recursive: true })
+    await writeFile(
+      join(tmpDir, 'stale-agent', 'heartbeat.json'),
+      JSON.stringify({ ts: Date.now() - 20000 }),
+    )
+
+    // no-heartbeat-agent has no heartbeat.json at all
+
+    server = spawnServer(tmpDir, 'online-agent')
+    await initializeServer(server)
+
+    // Wait for heartbeat to be written by the server
+    await Bun.sleep(3500)
+  })
+
+  afterAll(async () => {
+    server.kill()
+    await rm(tmpDir, { recursive: true, force: true })
+  })
+
+  test('shows online/offline/unknown status', async () => {
+    server.send('tools/call', { name: 'list_agents', arguments: {} }, 2)
+    const resp = await server.readResponse()
+
+    const content = resp.result?.content as Array<{
+      type: string
+      text: string
+    }>
+    const text = content[0].text
+
+    // online-agent is this agent, so it shows (this agent)
+    const onlineLine = text
+      .split('\n')
+      .find((l: string) => l.includes('online-agent'))
+    expect(onlineLine).toContain('(this agent)')
+
+    // stale-agent has an old heartbeat, should show (offline)
+    const staleLine = text
+      .split('\n')
+      .find((l: string) => l.includes('stale-agent'))
+    expect(staleLine).toContain('(offline)')
+
+    // no-heartbeat-agent has no heartbeat file, should show (unknown)
+    const unknownLine = text
+      .split('\n')
+      .find((l: string) => l.includes('no-heartbeat-agent'))
+    expect(unknownLine).toContain('(unknown)')
+  }, 15000)
+})
+
+describe('send offline warning', () => {
+  let tmpDir: string
+  let server: ReturnType<typeof spawnServer>
+
+  beforeAll(async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), 'intercom-test-'))
+    server = spawnServer(tmpDir, 'warning-sender')
+    await initializeServer(server)
+  })
+
+  afterAll(async () => {
+    server.kill()
+    await rm(tmpDir, { recursive: true, force: true })
+  })
+
+  test('warns when target has no heartbeat', async () => {
+    server.send(
+      'tools/call',
+      {
+        name: 'send',
+        arguments: { to: 'ghost-agent', message: 'are you there?' },
+      },
+      2,
+    )
+    const resp = await server.readResponse()
+
+    const content = resp.result?.content as Array<{
+      type: string
+      text: string
+    }>
+    const text = content[0].text
+
+    expect(text).toContain('Sent to ghost-agent')
+    expect(text).toContain('offline')
+    expect(text).toContain('queued')
+  })
+
+  test('does not warn when target is online', async () => {
+    // Write a fresh heartbeat for the target
+    const targetDir = join(tmpDir, 'alive-agent')
+    await mkdir(targetDir, { recursive: true })
+    await writeFile(
+      join(targetDir, 'heartbeat.json'),
+      JSON.stringify({ ts: Date.now() }),
+    )
+
+    server.send(
+      'tools/call',
+      {
+        name: 'send',
+        arguments: { to: 'alive-agent', message: 'hello' },
+      },
+      3,
+    )
+    const resp = await server.readResponse()
+
+    const content = resp.result?.content as Array<{
+      type: string
+      text: string
+    }>
+    const text = content[0].text
+
+    expect(text).toBe('Sent to alive-agent')
+    expect(text).not.toContain('offline')
+  })
 })
