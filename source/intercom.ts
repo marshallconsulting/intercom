@@ -6,7 +6,7 @@
  * MCP channel server that lets Claude Code agents send messages to each other.
  * Messages arrive as <channel> tags, just like Telegram or Discord messages.
  *
- * Config: Set CLAUDE_AGENT_ID env var to identify this agent.
+ * Config: Set INTERCOM_AGENT_ID (or CLAUDE_AGENT_ID) env var to identify this agent.
  * Storage: ~/.claude/intercom/<agent-id>/inbox/ for pending messages
  *
  * https://github.com/marshallconsulting/intercom
@@ -33,7 +33,10 @@ import {
 const INTERCOM_DIR =
   process.env.INTERCOM_DIR || join(homedir(), '.claude', 'intercom')
 const AGENT_ID =
-  process.env.CLAUDE_AGENT_ID || process.env.AGENT_ID || 'unknown'
+  process.env.INTERCOM_AGENT_ID ||
+  process.env.CLAUDE_AGENT_ID ||
+  process.env.AGENT_ID ||
+  'unknown'
 const POLL_INTERVAL_MS = 2000
 
 // --- MCP Server Setup ---
@@ -46,9 +49,13 @@ const mcp = new Server(
       tools: {},
     },
     instructions: [
-      `Messages from other agents arrive as <channel source="intercom" from="agent-id" message_id="...">`,
-      `You are agent "${AGENT_ID}". Reply with the send tool, passing the sender's ID as "to".`,
-      `Use broadcast to message all agents. Use list_agents to see who's online.`,
+      `You are agent "${AGENT_ID}". Messages from other agents arrive as <channel> tags.`,
+      `Protocol: Always acknowledge messages so the sender knows they landed.`,
+      `- Informational messages: acknowledge briefly in your own words.`,
+      `- Requests that take time: let them know you're on it, then send the result when done.`,
+      `- Quick questions: just respond directly.`,
+      `Keep messages concise. State what you need, why, and what action you expect.`,
+      `Don't ping-pong. An acknowledgment ends the exchange. Don't reply to an ack with another ack. One and done.`,
     ].join('\n'),
   },
 )
@@ -59,33 +66,45 @@ mcp.setRequestHandler(ListToolsRequestSchema, async () => ({
   tools: [
     {
       name: 'send',
-      description: 'Send a message to another agent',
+      description:
+        'Send a message to a specific agent. Keep messages concise: state what you need, why, and what action you expect. Always acknowledge messages you receive so the sender knows they landed. For longer tasks, let them know you are on it and send the result when done. One ack ends the exchange, no ping-pong. Use list_agents first if unsure of the agent ID.',
       inputSchema: {
         type: 'object' as const,
         properties: {
           to: {
             type: 'string',
-            description: 'Target agent ID (e.g. team-cto)',
+            description:
+              'Target agent ID (e.g. team-cto). Run list_agents if unsure.',
           },
-          message: { type: 'string', description: 'Message to send' },
+          message: {
+            type: 'string',
+            description:
+              'Message to send. Be concise. Structure: what you need, why, expected action.',
+          },
         },
         required: ['to', 'message'],
       },
     },
     {
       name: 'broadcast',
-      description: 'Send a message to all registered agents',
+      description:
+        'Send a message to ALL registered agents. Use sparingly. Every agent receives this and it consumes context in all of them. Appropriate for announcements that affect everyone (e.g. "deploy complete", "database migrated"). Not appropriate for questions that only one agent can answer. Use send for targeted messages. Recipients should only reply if the message is relevant to them.',
       inputSchema: {
         type: 'object' as const,
         properties: {
-          message: { type: 'string', description: 'Message to broadcast' },
+          message: {
+            type: 'string',
+            description:
+              'Message to broadcast. Keep it short. Every online agent will receive this.',
+          },
         },
         required: ['message'],
       },
     },
     {
       name: 'list_agents',
-      description: 'List all registered agents',
+      description:
+        "List all registered agents and their status. Call this before your first send to know who is available. You don't need to call it before every message, just when you need to discover agents or check who is online.",
       inputSchema: {
         type: 'object' as const,
         properties: {},

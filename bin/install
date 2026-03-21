@@ -2,14 +2,22 @@
 set -euo pipefail
 
 # Intercom installer
-# Registers intercom as a global MCP server in ~/.claude/.mcp.json
-# so every Claude Code session has messaging access without per-repo setup.
+# 1. Installs dependencies
+# 2. Registers intercom in global MCP config (tools everywhere)
+# 3. Adds .mcp.json to a target project (channels for real-time delivery)
 
 # --- Resolve repo root from this script's location ---
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 SERVER_PATH="$REPO_ROOT/source/intercom.ts"
+
+# Target project is the first argument, or current directory
+TARGET_PROJECT="${1:-.}"
+TARGET_PROJECT="$(cd "$TARGET_PROJECT" 2>/dev/null && pwd)" || {
+  echo "Error: directory not found: $1"
+  exit 1
+}
 
 # --- Check prerequisites ---
 
@@ -37,18 +45,8 @@ fi
 echo "Installing dependencies..."
 (cd "$REPO_ROOT/source" && bun install --silent)
 
-# --- Configure global MCP server ---
+# --- Build the intercom server entry ---
 
-MCP_CONFIG="$HOME/.claude/.mcp.json"
-
-# Create the config file if it doesn't exist
-if [ ! -f "$MCP_CONFIG" ]; then
-  mkdir -p "$(dirname "$MCP_CONFIG")"
-  echo '{"mcpServers":{}}' > "$MCP_CONFIG"
-  echo "Created $MCP_CONFIG"
-fi
-
-# Build the intercom server entry
 INTERCOM_ENTRY=$(jq -n \
   --arg server "$SERVER_PATH" \
   '{
@@ -57,26 +55,49 @@ INTERCOM_ENTRY=$(jq -n \
     type: "stdio"
   }')
 
-# Add or update the intercom entry, preserving all other servers
+# --- Configure global MCP server ---
+
+MCP_GLOBAL="$HOME/.claude/.mcp.json"
+
+if [ ! -f "$MCP_GLOBAL" ]; then
+  mkdir -p "$(dirname "$MCP_GLOBAL")"
+  echo '{"mcpServers":{}}' > "$MCP_GLOBAL"
+fi
+
 jq --argjson entry "$INTERCOM_ENTRY" \
   '.mcpServers.intercom = $entry' \
-  "$MCP_CONFIG" > "$MCP_CONFIG.tmp" && mv "$MCP_CONFIG.tmp" "$MCP_CONFIG"
+  "$MCP_GLOBAL" > "$MCP_GLOBAL.tmp" && mv "$MCP_GLOBAL.tmp" "$MCP_GLOBAL"
+
+echo "  Global:  $MCP_GLOBAL (tools available in all sessions)"
+
+# --- Configure project-level .mcp.json ---
+
+MCP_PROJECT="$TARGET_PROJECT/.mcp.json"
+
+if [ -f "$MCP_PROJECT" ]; then
+  # Add or update intercom entry, preserve everything else
+  jq --argjson entry "$INTERCOM_ENTRY" \
+    '.mcpServers.intercom = $entry' \
+    "$MCP_PROJECT" > "$MCP_PROJECT.tmp" && mv "$MCP_PROJECT.tmp" "$MCP_PROJECT"
+else
+  # Create new project config
+  jq -n --argjson entry "$INTERCOM_ENTRY" \
+    '{ mcpServers: { intercom: $entry } }' > "$MCP_PROJECT"
+fi
+
+echo "  Project: $MCP_PROJECT (channels for real-time delivery)"
+
+# --- Summary ---
 
 echo ""
-echo "Done. Intercom is configured as a global MCP server."
+echo "Done. Intercom is installed."
 echo ""
-echo "  Config:  $MCP_CONFIG"
-echo "  Server:  $SERVER_PATH"
+echo "  Server: $SERVER_PATH"
 echo ""
-echo "Every new Claude Code session now has access to intercom tools"
-echo "(send, broadcast, list_agents)."
+echo "Start a session:"
 echo ""
-echo "To set your agent ID, export CLAUDE_AGENT_ID before launching Claude Code:"
+echo "  cd $TARGET_PROJECT"
+echo "  export INTERCOM_AGENT_ID=my-agent"
+echo "  claude --dangerously-load-development-channels server:intercom"
 echo ""
-echo "  export CLAUDE_AGENT_ID=my-agent"
-echo "  claude"
-echo ""
-echo "Without it, the agent defaults to \"unknown\" (fine for casual use)."
-echo ""
-echo "If you have per-repo .mcp.json entries for intercom in other projects,"
-echo "you can remove them. The global config handles it now."
+echo "Without INTERCOM_AGENT_ID, the agent defaults to \"unknown\" (fine for casual use)."
