@@ -33,22 +33,28 @@ Read the plan file. Verify:
 
 If the plan isn't ready, stop and tell the user.
 
-### 1b. Move Plan to Active on Main
+### 1b. Commit Plan and Move to Active on Main
 
-Signal to other agents that this plan is taken:
+First, ensure the plan file is committed to main. Untracked plans cause `git mv` failures and also mean other agents can't see the plan in the repo. This commit also acts as a lock: once it's on main, other agents won't pick it up.
 
 ```bash
-git add workflow/plans/<plan>.md
+# Commit the plan (and its proposal, if not already tracked)
+git add workflow/plans/<plan>.md workflow/proposals/accepted/
+git commit -m "chore: add <plan> plan and accepted proposal"
+```
+
+If both files are already tracked, this will be a no-op. That's fine.
+
+Then move to active:
+
+```bash
+mkdir -p workflow/plans/active
+git mv workflow/plans/<plan>.md workflow/plans/active/<plan>.md
 git commit -m "chore: mark <plan> as active (execution started)"
+git push
 ```
 
-Then move the file:
-
-```bash
-mv workflow/plans/<plan>.md workflow/plans/active/<plan>.md
-```
-
-Note: if the plan file isn't tracked yet, use `mv` instead of `git mv`.
+The push is important: it makes the lock visible to agents in other repos or worktrees.
 
 ### 1c. Launch the Execute Agent
 
@@ -96,7 +102,7 @@ Read the plan file. Extract:
 - **Dependencies**: What must exist first
 - **Readiness Audit**: Check that the audit verdict is READY
 
-Also read `CLAUDE.md` at the repo root for project conventions: language, test commands, code location, linting, etc.
+Also read `CLAUDE.md` at the repo root for project conventions: language, test commands, code location, linting, etc. If a `playbook/` folder exists, read it before writing any code. The playbook contains patterns, anti-patterns, and guardrails specific to this project. Follow them during execution.
 
 If the plan doesn't have clear steps or acceptance criteria, stop and return: "This plan needs more detail before I can execute it. It's missing [X]."
 
@@ -108,33 +114,47 @@ Rename the branch from the auto-generated worktree name to a human-readable name
 git branch -m $(git branch --show-current) <plan-name-without-extension>
 ```
 
-### Step 3: Execute Phases
+### Step 3: Create Tasks
 
-For each phase in the plan, in order:
-1. Do the work (write code, edit files, create tests)
-2. Run the project's test command (check CLAUDE.md for the command)
-3. If tests fail, fix the issue before moving on
-4. Run the project's linter if configured
-5. Commit with a descriptive message after each phase
+Use `TaskCreate` to create one task per phase from the plan. Each task should have:
+- A clear, imperative subject
+- A description with enough detail to execute without re-reading the plan
+
+Set up dependencies with `addBlockedBy` if tasks must be sequential.
+
+Show the task list briefly, then proceed immediately. Do NOT ask for confirmation. The plan was already approved when it was written.
+
+### Step 4: Execute Tasks
+
+For each task, in order:
+1. Mark it `in_progress` with `TaskUpdate`
+2. **Update execution status** (see Status Reporting below)
+3. Do the work (write code, edit files, create tests)
+4. Run the project's test command (check CLAUDE.md for the command)
+5. If tests fail, fix the issue before moving on
+6. Mark it `completed` with `TaskUpdate`
+7. **Update execution status** with new task count
+8. Commit after each phase or logical group (not one giant commit at the end)
 
 **Key rules during execution:**
 - Follow the project's CLAUDE.md conventions
 - Write tests for new code
 - Don't over-engineer beyond what the plan specifies
 - If blocked, stop and return with what you accomplished and what blocked you
-- Commit after each phase or logical group (not one giant commit at the end)
 
-### Step 4: Final Verification
+### Step 5: Final Verification
 
-After all phases complete, run the same checks CI will run. **Do NOT push until these pass.**
+After all tasks complete, run the same checks CI will run. **Do NOT push until these pass.**
 
 1. Run the full test suite. All tests must pass.
-2. Run the project's linter if configured. Fix any remaining violations.
+2. Run the project's linter with autofix if configured. Fix any remaining violations.
 3. Commit any lint fixes.
+4. Run `git diff main --stat` to review what changed.
+5. Show the user a summary of what was built.
 
 **If tests or linting fail, fix them before proceeding.**
 
-### Step 5: Update Specs
+### Step 6: Update Specs
 
 **Specs are the source of truth. If the code changed, the specs must match.**
 
@@ -146,7 +166,7 @@ Check the plan for any "Specs to Write" section and any existing specs that the 
 
 **Do NOT skip this step.** Stale specs are worse than no specs.
 
-### Step 6: Archive the Plan
+### Step 7: Archive the Plan
 
 1. **Update acceptance criteria checkboxes** in the plan to reflect what was completed.
 
@@ -159,7 +179,7 @@ git mv workflow/plans/active/<plan>.md workflow/plans/archived/<plan>.md
 git commit -m "chore: archive <plan> with execution notes"
 ```
 
-### Step 7: Push and Open PR
+### Step 8: Push and Open PR
 
 Push the branch and create a PR. This is the final step. The subagent owns the full lifecycle.
 
@@ -177,7 +197,7 @@ EOF
 )"
 ```
 
-### Step 8: Report Results
+### Step 9: Report Results
 
 Return a summary to the caller:
 - The **PR URL**
@@ -223,3 +243,50 @@ Common patterns by stack. Check CLAUDE.md for the actual commands.
 | Code location | `source/` | `src/` | `src/` |
 | Test location | `source/test/` | `tests/` | `__tests__/` or `*.test.ts` |
 | Config | `package.json` | `pyproject.toml` | `package.json` |
+
+## Status Reporting
+
+The execute agent must write progress to `.claude/execution-status.json` at the **repo root** (not the worktree) so the `cdd-pulse-tui` can monitor it. This file is gitignored.
+
+**When to update:** After each task starts, completes, or when the phase changes. Also update `thinking` when starting a new piece of work.
+
+**How to update:** Write the JSON file using bash:
+
+```bash
+cat > /path/to/repo/.claude/execution-status.json << 'STATUSEOF'
+{
+  "plan": "agent-heartbeat",
+  "status": "executing",
+  "current_phase": "Phase 2: Online/Offline in list_agents",
+  "current_task": "Add getAgentStatus helper",
+  "tasks_done": 1,
+  "tasks_total": 5,
+  "thinking": "Adding heartbeat reader and status display",
+  "last_message": "Tests passing after Phase 1",
+  "recent_activity": [
+    "Added heartbeat writer to pollInbox",
+    "Tests: 7 pass, 0 fail"
+  ],
+  "last_update": "2026-03-21T18:30:00Z"
+}
+STATUSEOF
+```
+
+**Fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `plan` | string | Plan filename without extension |
+| `status` | string | `executing`, `testing`, `linting`, `pushing`, `done`, `failed` |
+| `current_phase` | string | e.g., "Phase 2: Online/Offline in list_agents" |
+| `current_task` | string | The task currently being worked on |
+| `tasks_done` | int | Number of completed tasks |
+| `tasks_total` | int | Total number of tasks |
+| `thinking` | string | What the agent is currently reasoning about (1 line) |
+| `last_message` | string | Last notable event (test results, commit, etc.) |
+| `recent_activity` | array | Last 3-5 actions taken (file created, test run, etc.) |
+| `last_update` | string | ISO timestamp |
+
+**Important:** If running in a worktree, write to the **main repo root**, not the worktree directory. The repo root path is the parent of `.claude/worktrees/`. Use `git -C . rev-parse --show-superproject-working-tree` or hardcode based on the worktree path.
+
+**On completion:** Set status to `done` with final task counts. On failure, set to `failed` with the error in `last_message`.

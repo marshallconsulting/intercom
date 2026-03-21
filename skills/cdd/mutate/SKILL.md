@@ -1,7 +1,7 @@
 ---
 name: mutate
 description: Mutate traits from one artifact onto another. Reads theirs and ours, identifies improvements in theirs, and rewrites ours to incorporate them while preserving its existing identity. Use when the user says "/mutate", "mutate this", "pull traits from", or wants to evolve a skill, spec, or CDD.md from another version.
-args: "ours=<path> theirs=<path>"
+args: "ours=<path> theirs=<path> [-sync]"
 ---
 
 # /mutate - Trait-Based Artifact Mutation
@@ -13,10 +13,10 @@ Read theirs. Read ours. Identify the traits in theirs worth adopting. Rewrite ou
 ```
 /mutate ours=skills/cdd/execute-plan/SKILL.md theirs=~/.claude/skills/execute-plan/SKILL.md
 /mutate ours=CDD.md theirs=~/other-project/CDD.md
-/mutate ours=specs/protocol.md theirs=~/other-project/specs/messaging.md
+/mutate ours=skills/cdd/execute-plan/SKILL.md theirs=~/.claude/skills/execute-plan/SKILL.md -sync
 ```
 
-Both arguments are required. `ours` is the file that gets rewritten. `theirs` is read-only.
+`ours` and `theirs` are required. `ours` is the file that gets rewritten first. Add `-sync` to automatically run it again with the roles swapped (see "Sync Mode" below).
 
 ## What This Is
 
@@ -82,24 +82,40 @@ After rewriting, show the user a summary of what changed:
 
 Do not commit. The user reviews the changes and decides next steps.
 
-## Reverse Mutation
+## Sync Mode (`-sync`)
 
-The arguments are interchangeable. To push traits from a local skill back to the global version:
+When `-sync` is passed, the skill runs the standard mutation (Steps 1-5) as normal, then **automatically runs it again with ours and theirs swapped**.
+
+### How It Works
+
+1. **Pass 1:** Normal mutation. `ours` gets rewritten with traits from `theirs`. User reviews and approves.
+2. **Pass 2:** Roles reverse. Now the original `theirs` becomes `ours` and gets rewritten with traits from the (now-updated) original `ours`. User reviews and approves.
+
+Each pass is a full mutation: read both, identify traits, present them, get approval, apply. The second pass may find different traits than the first, because each file may have unique improvements the other lacks.
+
+### When to Use
+
+After editing a CDD skill that has a local/global counterpart. Instead of running `/mutate` twice manually:
 
 ```
+# Without sync: two separate invocations
 /mutate ours=~/.claude/skills/execute-plan/SKILL.md theirs=skills/cdd/execute-plan/SKILL.md
+/mutate ours=skills/cdd/execute-plan/SKILL.md theirs=~/.claude/skills/execute-plan/SKILL.md
+
+# With sync: one invocation, both directions
+/mutate ours=skills/cdd/execute-plan/SKILL.md theirs=~/.claude/skills/execute-plan/SKILL.md -sync
 ```
 
-Same process, opposite direction. "Ours" is always the file that gets rewritten.
+The order of ours/theirs determines which file gets mutated first. Start with whichever side you want to update first.
 
 ## Examples
 
-**Sync a repo skill with its global counterpart:**
+**Bidirectional sync between local and global:**
 ```
-/mutate ours=skills/cdd/execute-plan/SKILL.md theirs=~/.claude/skills/execute-plan/SKILL.md
+/mutate ours=~/.claude/skills/execute-plan/SKILL.md theirs=skills/cdd/execute-plan/SKILL.md -sync
 ```
 
-**Evolve CDD.md from another project:**
+**One-directional mutation (no sync):**
 ```
 /mutate ours=CDD.md theirs=~/data/other-project/CDD.md
 ```
@@ -107,9 +123,4 @@ Same process, opposite direction. "Ours" is always the file that gets rewritten.
 **Pull a spec pattern from a different repo:**
 ```
 /mutate ours=specs/protocol.md theirs=~/data/other-project/specs/messaging.md
-```
-
-**Push local improvements back to global:**
-```
-/mutate ours=~/.claude/skills/audit-plan/SKILL.md theirs=skills/cdd/audit-plan/SKILL.md
 ```
