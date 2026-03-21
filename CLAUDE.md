@@ -47,8 +47,12 @@ Agent A                    File System                   Agent B
 intercom/
 ├── CDD.md              # Methodology reference
 ├── CLAUDE.md           # This file
+├── quick-start.md      # Setup instructions (also in specs/setup.md)
+├── bin/
+│   └── install         # Installer: registers intercom as global MCP server
 ├── specs/
 │   ├── protocol.md     # Message format, delivery semantics
+│   ├── setup.md        # Installation, configuration, agent ID
 │   └── sandbox/        # Half-baked spec ideas
 ├── workflow/
 │   ├── proposals/      # Features waiting to be built
@@ -66,15 +70,17 @@ intercom/
 │       └── reconcile/
 ├── research/           # Distilled external knowledge
 ├── transcripts/        # Cleaned design session records
-├── docs/
-│   └── quick-start.md
+├── docs/               # GitHub Pages site (public-facing content)
 └── experiments/        # POCs and throwaway explorations
 ```
 
 ## Working in This Repo
 
 ```bash
-# Install dependencies
+# First-time setup: register intercom as a global MCP server
+bin/install
+
+# Install dependencies (also done by bin/install)
 cd source && bun install
 
 # Run the server (normally launched by Claude Code, not manually)
