@@ -1,6 +1,6 @@
 # Proposal: Agent Heartbeat and Online/Offline Status
 
-**Status:** Draft
+**Status:** Accepted
 
 ## Problem
 
