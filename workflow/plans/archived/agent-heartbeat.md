@@ -17,12 +17,12 @@
 
 ## Acceptance Criteria
 
-- [ ] Running agent writes `heartbeat.json` to its directory every poll cycle
-- [ ] `heartbeat.json` contains a single timestamp, overwritten each cycle (no growth)
-- [ ] `list_agents` shows `(online)` or `(offline)` next to each agent
-- [ ] `send` delivers message regardless of status, but response includes "Agent appears offline" when target heartbeat is stale (>10s)
-- [ ] Agents without a heartbeat file show as `(unknown)` rather than erroring
-- [ ] `bun test` passes
+- [x] Running agent writes `heartbeat.json` to its directory every poll cycle
+- [x] `heartbeat.json` contains a single timestamp, overwritten each cycle (no growth)
+- [x] `list_agents` shows `(online)` or `(offline)` next to each agent
+- [x] `send` delivers message regardless of status, but response includes "Agent appears offline" when target heartbeat is stale (>10s)
+- [x] Agents without a heartbeat file show as `(unknown)` rather than erroring
+- [x] `bun test` passes
 
 ## Phase 1: Heartbeat Writer
 
@@ -126,3 +126,19 @@ None required. All prerequisites are in place.
 ### Blockers
 
 None identified.
+
+## Execution Notes
+
+Executed autonomously on 2026-03-21. All five phases completed in order.
+
+**Phase 1 -- Heartbeat Writer:** Added `HEARTBEAT_STALE_MS = 10_000` constant and a single `writeFile` call at the top of the `pollInbox()` loop. Each cycle overwrites `heartbeat.json` with `{ ts: Date.now() }`. No growth, no append.
+
+**Phase 2 -- Online/Offline in list_agents:** Added `getAgentStatus()` helper that reads `heartbeat.json` and returns `'online'`, `'offline'`, or `'unknown'`. Updated `listAgents()` to show status in parentheses next to each agent. Current agent keeps `(this agent)` label only (online by definition).
+
+**Phase 3 -- Offline Warning on send:** After writing the message file, `sendMessage()` checks `getAgentStatus(targetId)`. If not online, the response includes "Agent appears offline -- message queued in their inbox." Message is always delivered regardless.
+
+**Phase 4 -- Spec Update:** Replaced the "Deregistration" placeholder in `specs/protocol.md` with heartbeat semantics. Added `heartbeat.json` to the storage layout diagram. Updated `list_agents` and `send` tool descriptions.
+
+**Phase 5 -- Tests:** Added four new tests: heartbeat file creation, list_agents status display (online/offline/unknown), send offline warning for unknown targets, and clean response for online targets. All 11 tests pass (7 original + 4 new).
+
+**Final verification:** `bun test` passes (11/11), `bun run lint` passes clean. No changes outside the repo.
