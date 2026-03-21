@@ -28,7 +28,7 @@ Working. Tested live with 3 agents (CTO, CMO, CFO) sending messages to each othe
 - `source/intercom.ts` — MCP channel server (~260 lines)
 - `source/package.json` — Dependencies
 - `specs/protocol.md` — Protocol specification
-- `specs/schemas/message.md` — Message schema
+- `specs/protocol.md` — Protocol spec (includes message schema)
 
 ## Decisions Made
 

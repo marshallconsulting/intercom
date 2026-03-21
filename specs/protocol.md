@@ -65,7 +65,15 @@ No explicit deregistration. Stale agents remain in the registry. Future: heartbe
 
 ## Message Schema
 
-See `schemas/message.md`.
+```typescript
+interface IntercomMessage {
+  id: string        // Unique ID: `${timestamp}-${sender-agent-id}`
+  from: string      // Sender agent ID
+  to: string        // Recipient agent ID
+  message: string   // Message content (plain text)
+  ts: string        // ISO 8601 timestamp
+}
+```
 
 ## Security Model
 

@@ -49,8 +49,7 @@ intercom/
 ├── CLAUDE.md           # This file
 ├── specs/
 │   ├── protocol.md     # Message format, delivery semantics
-│   └── schemas/
-│       └── message.md  # IntercomMessage schema
+│   └── sandbox/        # Half-baked spec ideas
 ├── workflow/
 │   ├── proposals/      # Features waiting to be built
 │   └── plans/

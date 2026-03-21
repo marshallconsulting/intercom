@@ -10,7 +10,7 @@ A methodology for building software with AI agents. The agent reads context (spe
 
 ```
 specs/          — Domain knowledge (what and why)
-  schemas/      — Data model definitions
+  sandbox/      — Half-baked spec ideas, domain sketches
 workflow/       — Decision and execution pipeline
   proposals/    — Ideas waiting for acceptance
     accepted/   — Approved, ready for planning
