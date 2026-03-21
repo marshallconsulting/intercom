@@ -64,8 +64,7 @@ project/
 │       └── archived/   # Completed plans with execution notes
 ├── playbook/           # How to build (patterns, guardrails, conventions)
 ├── source/             # All application code
-├── skills/             # CDD skills (slash commands for the workflow)
-│   └── cdd/            # Pipeline skills: accept, audit, execute, reconcile
+├── skills/             # CDD skills (optional, for repos that develop skills locally)
 ├── research/           # Distilled external knowledge
 ├── transcripts/        # Cleaned design session records
 ├── docs/               # External-facing content
@@ -208,17 +207,11 @@ The `/import-transcript` skill automates the cleanup: read the raw transcript, s
 
 ## Skills
 
-Skills are Claude Code slash commands that encode repeatable workflows. Each skill has a `SKILL.md` file with instructions the agent follows.
-
-The pipeline skills listed below are specific to this repo's CDD setup. Your repo may have different skills or different versions of these.
-
-**Important:** For Claude Code to discover skills, they must be in `.claude/skills/` (project) or `~/.claude/skills/` (global). The `skills/cdd/` folder in the repo is the source of truth, but you'll need to copy or symlink them into one of those locations. If you run `/accept-proposal` and nothing happens, this is probably why.
-
-In this repo, CDD skills live in `skills/cdd/`:
+Skills are Claude Code slash commands that encode repeatable workflows. Each skill is a `SKILL.md` file with YAML frontmatter (`name`, `description`, `args`) followed by markdown instructions. Install them in `~/.claude/skills/` (global) or `.claude/skills/` (project-level).
 
 ### Pipeline Skills
 
-These form the core CDD workflow in order:
+These automate the core CDD workflow:
 
 | Skill | Purpose | Input | Output |
 |-------|---------|-------|--------|
@@ -229,9 +222,9 @@ These form the core CDD workflow in order:
 | `/mutate` | Pull traits from one artifact onto another (theirs/ours) | Two file paths | Rewritten ours file |
 | `/nightshift` | Batch-execute all queued plans overnight as stacked PRs | Plans in `workflow/plans/` | Stack of PRs for morning review |
 
-### Writing New Skills
+None of these are required to use CDD. The folder structure and workflow work without any skills installed. Skills just automate what you'd otherwise do manually.
 
-A skill is a `SKILL.md` file with YAML frontmatter (`name`, `description`, `args`) followed by markdown instructions. The agent reads and follows these instructions when the skill is invoked.
+### Writing New Skills
 
 Good skills are:
 - **Deterministic where possible.** If the task is a script (API polling, file processing), write a script and have the skill orchestrate it.
@@ -317,19 +310,22 @@ You're encouraged to change CDD. Modify this file, rewrite skills, add new pipel
 
 The only thing that matters is that the context keeps accumulating and stays accurate. If your changes serve that goal, they're good changes.
 
+Every repo should have its own copy of CDD.md. It serves two purposes: the local agent reads it to understand how this project's workflow operates, and the local agent improves it when it discovers something better during execution. A bug fix in the pipeline, a missing guardrail, a clearer way to explain a concept. Those improvements get committed to the repo's CDD.md and become available for other repos to pull from via mutation.
+
 ### Mutation
 
-When a change works well, it can flow to other repos. In CDD this is called **mutation**: an agent reads theirs and ours, identifies the specific **traits** worth adopting (a structural pattern, a new concept, a better workflow step), and rewrites ours to incorporate those traits while preserving everything else.
+When a repo improves its CDD.md, skills, or specs, those improvements can flow to other repos. In CDD this is called **mutation**: an agent reads two versions of an artifact, identifies the **traits** worth adopting (a structural pattern, a new concept, a better workflow step), and rewrites the target to incorporate them while preserving everything else.
 
-This works on any artifact:
-- **Skills:** A repo improves the audit skill with better POC validation. That trait gets mutated onto the global skill and other repos' copies, adapted to each context.
-- **CDD.md:** Someone adds a section about transcript-driven proposal generation. Other repos pull that trait without losing their own pipeline customizations.
-- **Specs:** A cross-repo pattern emerges (e.g., a standard way to describe message schemas). Each repo mutates the pattern onto its own specs with domain-specific details.
+Mutation is not merging. It's comprehension-based. The agent understands the intent of the improvement and applies that understanding in a different context. The two files don't need to be the same shape. You're extracting the useful idea and rewriting with it.
 
-Mutation is not merging. Merging is mechanical: combine two texts, resolve conflicts. Mutation is comprehension-based: understand the intent of the improvement, then apply that understanding in a different context. Theirs and ours don't need to be the same shape. They don't even need to be about the same thing. You're extracting the useful idea and rewriting with it.
+```
+/mutate ours=CDD.md theirs=~/data/other-project/CDD.md
+```
 
-No repo is "upstream." Every repo is a peer that can contribute traits to any other.
+Every repo that adopts CDD will change it, and that divergence is a feature. But good ideas still need to flow between repos without flattening each repo's customizations. Mutation handles that. Use `-sync` to run it in both directions when two repos have each picked up different improvements.
 
-CDD itself evolved this way. The methodology started at Marshall Consulting across ten-plus repos, each adapting the workflow to its own needs. Skills diverged. CDD.md diverged. Good ideas surfaced in one repo, got mutated onto others, and the weaker versions fell away. After enough rounds of this, the methodology stabilized enough to share here as a starting point for others. This repo is not the canonical version. It's a peer, just like the repos it came from.
+No repo is "upstream." Every repo is a peer that can contribute traits to any other. For more on how this works in practice, see [research/mutation.md](research/mutation.md).
+
+CDD itself evolved this way. The methodology started at Marshall Consulting across multiple repos, each adapting the workflow to its own needs. Good ideas surfaced in one repo, got mutated onto others, and the weaker versions fell away. This repo is not the canonical version. It's a peer, just like the repos it came from.
 
 See [CDD_ACKNOWLEDGMENTS.md](CDD_ACKNOWLEDGMENTS.md) for credits.
