@@ -16,7 +16,7 @@ Intercom is a file-based messaging system for Claude Code agents. Messages are J
 ## Tools
 
 ### `send`
-Send a direct message to one agent.
+Send a direct message to one agent. If the target agent appears offline or has no heartbeat, the message is still delivered but the response includes an offline warning.
 - `to` (string, required) — Target agent ID
 - `message` (string, required) — Message content
 
@@ -25,7 +25,7 @@ Send a message to all registered agents (except self).
 - `message` (string, required) — Message content
 
 ### `list_agents`
-List all registered agents. Returns agent IDs and registration timestamps.
+List all registered agents with online/offline status. Each agent is shown as `(online)`, `(offline)`, or `(unknown)` based on its heartbeat. The current agent is labeled `(this agent)` instead.
 
 ## Agent Lifecycle
 
@@ -38,8 +38,8 @@ On startup, the MCP server:
 ### Discovery
 Any agent can call `list_agents` to see all registered agents. Registration persists across sessions (info.json stays until cleaned up).
 
-### Deregistration
-No explicit deregistration. Stale agents remain in the registry. Future: heartbeat-based liveness detection.
+### Heartbeat
+Each poll cycle, the agent writes `heartbeat.json` to its directory with the current timestamp. An agent is considered **online** if its heartbeat is less than 10 seconds old, **offline** if older, and **unknown** if no heartbeat file exists (e.g., agents registered before heartbeat support). There is no explicit deregistration. Registration persists via `info.json`; liveness is determined solely by the heartbeat.
 
 ## Delivery Semantics
 
@@ -53,12 +53,14 @@ No explicit deregistration. Stale agents remain in the registry. Future: heartbe
 ~/.claude/intercom/
 ├── agent-a/
 │   ├── info.json           # { agent_id, registered_at }
+│   ├── heartbeat.json      # { ts: <epoch ms> } -- written every poll cycle
 │   ├── inbox/              # Pending messages (JSON files)
 │   │   └── 1234-agent-b.json
 │   └── processed/          # Delivered messages (moved here)
 │       └── 1200-agent-c.json
 ├── agent-b/
 │   ├── info.json
+│   ├── heartbeat.json
 │   ├── inbox/
 │   └── processed/
 ```

@@ -38,6 +38,7 @@ const AGENT_ID =
   process.env.AGENT_ID ||
   'unknown'
 const POLL_INTERVAL_MS = 2000
+const HEARTBEAT_STALE_MS = 10_000
 
 // --- MCP Server Setup ---
 
@@ -154,8 +155,14 @@ async function sendMessage(targetId: string, message: string) {
 
   await writeFile(join(inbox, `${msgId}.json`), JSON.stringify(msg, null, 2))
 
+  const status = await getAgentStatus(targetId)
+  const text =
+    status === 'online'
+      ? `Sent to ${targetId}`
+      : `Sent to ${targetId}. Agent appears offline -- message queued in their inbox.`
+
   return {
-    content: [{ type: 'text' as const, text: `Sent to ${targetId}` }],
+    content: [{ type: 'text' as const, text }],
   }
 }
 
@@ -189,10 +196,15 @@ async function listAgents() {
     }
   }
 
-  const lines = agents.map((a) => {
-    const status = a.agent_id === AGENT_ID ? '(this agent)' : ''
-    return `  ${a.agent_id} ${status}`.trimEnd()
-  })
+  const lines: string[] = []
+  for (const a of agents) {
+    if (a.agent_id === AGENT_ID) {
+      lines.push(`  ${a.agent_id} (this agent)`)
+    } else {
+      const status = await getAgentStatus(a.agent_id)
+      lines.push(`  ${a.agent_id} (${status})`)
+    }
+  }
 
   return {
     content: [
@@ -231,6 +243,18 @@ async function getRegisteredAgents(): Promise<AgentInfo[]> {
   return agents
 }
 
+async function getAgentStatus(
+  agentId: string,
+): Promise<'online' | 'offline' | 'unknown'> {
+  const heartbeatPath = join(INTERCOM_DIR, agentId, 'heartbeat.json')
+  try {
+    const data = JSON.parse(await readFile(heartbeatPath, 'utf-8'))
+    return Date.now() - data.ts < HEARTBEAT_STALE_MS ? 'online' : 'offline'
+  } catch {
+    return 'unknown'
+  }
+}
+
 async function register() {
   const agentDir = join(INTERCOM_DIR, AGENT_ID)
   await mkdir(join(agentDir, 'inbox'), { recursive: true })
@@ -250,6 +274,11 @@ async function pollInbox() {
   await mkdir(processed, { recursive: true })
 
   while (true) {
+    await writeFile(
+      join(INTERCOM_DIR, AGENT_ID, 'heartbeat.json'),
+      JSON.stringify({ ts: Date.now() }),
+    )
+
     try {
       const files = await readdir(inbox)
       const jsonFiles = files.filter((f) => f.endsWith('.json')).sort()
