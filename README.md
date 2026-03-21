@@ -55,6 +55,12 @@ bin/install
 
 The installer registers intercom as a global MCP server in `~/.claude/.mcp.json`. Every Claude Code session gets messaging access automatically.
 
+**Let your agent do it.** Clone the repo, then point your agent at the [quick-start guide](intercom-quick-start.md) and it will handle the rest:
+
+> "Read /path/to/intercom/intercom-quick-start.md and set up intercom for this project"
+
+The guide has instructions for both humans and agents.
+
 ### 2. Set your agent ID (optional)
 
 ```bash
@@ -66,7 +72,7 @@ Without this, the agent defaults to `"unknown"`, which is fine for casual use.
 
 ### 3. Test it
 
-Launch two agents in separate terminals with different `CLAUDE_AGENT_ID` values. In Agent A:
+Launch two agents in separate terminals with different `INTERCOM_AGENT_ID` values. In Agent A:
 
 > "Send a message to agent-b saying hello"
 
