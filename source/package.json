@@ -6,9 +6,15 @@
   "bin": "./intercom.ts",
   "scripts": {
     "start": "bun run intercom.ts",
-    "test": "bun test"
+    "test": "bun test",
+    "lint": "bunx --bun biome check .",
+    "format": "bunx --bun biome format . --write",
+    "lint:fix": "bunx --bun biome check . --fix"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.8"
   }
 }
