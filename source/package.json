@@ -1,0 +1,14 @@
+{
+  "name": "intercom",
+  "version": "0.1.0",
+  "description": "Agent-to-agent messaging for Claude Code",
+  "type": "module",
+  "bin": "./intercom.ts",
+  "scripts": {
+    "start": "bun run intercom.ts",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0"
+  }
+}
