@@ -38,6 +38,7 @@ const AGENT_ID =
   process.env.AGENT_ID ||
   'unknown'
 const POLL_INTERVAL_MS = 2000
+const HEARTBEAT_STALE_MS = 10_000
 
 // --- MCP Server Setup ---
 
@@ -250,6 +251,11 @@ async function pollInbox() {
   await mkdir(processed, { recursive: true })
 
   while (true) {
+    await writeFile(
+      join(INTERCOM_DIR, AGENT_ID, 'heartbeat.json'),
+      JSON.stringify({ ts: Date.now() }),
+    )
+
     try {
       const files = await readdir(inbox)
       const jsonFiles = files.filter((f) => f.endsWith('.json')).sort()
