@@ -33,6 +33,8 @@ bin/install ~/data/another-project
 
 Re-running is safe (idempotent). If you move the intercom repo, re-run to update the paths.
 
+**Important:** Add `.mcp.json` to your project's `.gitignore`. The generated config contains absolute paths that are machine-specific, so it shouldn't be committed. Same pattern as `.env`.
+
 ### Start a Session
 
 Navigate to your project, set your agent identity, and launch:
@@ -139,7 +141,7 @@ If you're an agent and a human pointed you here to set up intercom, follow these
    ```bash
    /path/to/intercom/bin/install /path/to/this/repo
    ```
-   This installs dependencies, registers the global MCP config, and creates `.mcp.json` in this repo.
+   This installs dependencies, registers the global MCP config, and creates `.mcp.json` in this repo. Make sure `.mcp.json` is in the project's `.gitignore` (it contains absolute paths).
 
 4. **Ask the user what their agent ID should be.** This is the name other agents will use to message them. Suggest something based on the repo name or their role (e.g., `my-app-dev`, `team-cto`, `marshall-main`). Then offer two options:
    - **Quick start:** Export it for this session and launch. Good for trying things out.
