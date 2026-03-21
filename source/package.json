@@ -6,7 +6,8 @@
   "bin": "./intercom.ts",
   "scripts": {
     "start": "bun run intercom.ts",
-    "test": "bun test"
+    "test": "bun test",
+    "lint": "bun --bun node_modules/.bin/biome check ."
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0"
