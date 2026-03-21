@@ -1,0 +1,236 @@
+#!/usr/bin/env python3
+"""cdd-pulse-tui - Live TUI dashboard for CDD plan execution."""
+
+import json
+import subprocess
+import sys
+import time
+import signal
+import re
+import os
+
+REFRESH_INTERVAL = 3
+
+def get_terminal_width():
+    try:
+        import shutil
+        return max(shutil.get_terminal_size().columns, 60)
+    except Exception:
+        return 90
+
+BOX_WIDTH = get_terminal_width()
+
+class C:
+    RED = '\033[0;31m'
+    GREEN = '\033[0;32m'
+    YELLOW = '\033[0;33m'
+    BLUE = '\033[0;34m'
+    CYAN = '\033[0;36m'
+    MAGENTA = '\033[0;35m'
+    BOLD = '\033[1m'
+    DIM = '\033[2m'
+    NC = '\033[0m'
+
+def get_data():
+    try:
+        # Look for cdd-pulse in the same directory as this script
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        pulse_cmd = os.path.join(script_dir, 'cdd-pulse')
+        if not os.path.exists(pulse_cmd):
+            pulse_cmd = 'cdd-pulse'  # fallback to PATH
+        result = subprocess.run(
+            [pulse_cmd, '--json'],
+            capture_output=True, text=True, timeout=10
+        )
+        return json.loads(result.stdout)
+    except Exception:
+        return {}
+
+def progress_bar(done, total, width=20, color=C.GREEN):
+    if total == 0:
+        return f"{C.DIM}{'░' * width}{C.NC}"
+    filled = int((done / total) * width)
+    empty = width - filled
+    pct = int(done / total * 100)
+    bar = f"{color}{'█' * filled}{C.DIM}{'░' * empty}{C.NC}"
+    return f"{bar} {C.BOLD}{pct}%{C.NC}"
+
+def visible_len(s):
+    return len(re.sub(r'\033\[[0-9;]*m', '', s))
+
+def line(content, width=None):
+    if width is None:
+        width = get_terminal_width()
+    padding = width - 2 - visible_len(content)
+    if padding < 0:
+        padding = 0
+    return f"┃{content}{' ' * padding}┃"
+
+def hline(char='━', left='┣', right='┫', width=None):
+    if width is None:
+        width = get_terminal_width()
+    return f"{left}{char * (width - 2)}{right}"
+
+def safe_str(val, default=''):
+    if val is None:
+        return default
+    return str(val)
+
+def safe_int(val, default=0):
+    try:
+        return int(val)
+    except (ValueError, TypeError):
+        return default
+
+def render(data, tick=0):
+    print('\033[H\033[J', end='')
+
+    repo = safe_str(data.get('repo'), '?')
+    branch = safe_str(data.get('main_branch'), '?')
+    plans = data.get('plans', {}) if isinstance(data.get('plans'), dict) else {}
+    worktrees = data.get('worktrees', []) if isinstance(data.get('worktrees'), list) else []
+    open_prs = data.get('open_prs', []) if isinstance(data.get('open_prs'), list) else []
+    status = safe_str(data.get('status'), 'idle')
+    plan = safe_str(data.get('plan'), 'none')
+    phase = safe_str(data.get('current_phase'))
+    tasks_done = safe_int(data.get('tasks_done'))
+    tasks_total = safe_int(data.get('tasks_total'))
+    current_task = safe_str(data.get('current_task'))
+    last_msg = safe_str(data.get('last_message'))
+    last_update = safe_str(data.get('last_update'))
+    thinking = safe_str(data.get('thinking'))
+    recent = data.get('recent_activity', []) if isinstance(data.get('recent_activity'), list) else []
+
+    w = get_terminal_width()
+    maxtext = w - 6  # usable text width inside box
+    time_str = time.strftime('%H:%M:%S')
+    spinners = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
+    lines = []
+
+    # Header
+    lines.append(hline('━', '┏', '┓'))
+    pad = w - 18 - len(repo)
+    lines.append(line(f"  {C.BOLD}{C.CYAN}CDD PULSE{C.NC}  {repo}{'':>{max(0, pad)}}{C.DIM}{time_str}{C.NC}"))
+    lines.append(hline())
+
+    # Branch + Plans overview
+    lines.append(line(f"  Branch:  {C.BLUE}{branch}{C.NC}"))
+    p_ready = plans.get('ready', 0)
+    p_active = plans.get('active', 0)
+    p_archived = plans.get('archived', 0)
+    lines.append(line(f"  Plans:   {C.GREEN}{p_ready} ready{C.NC}  {C.YELLOW}{p_active} active{C.NC}  {C.DIM}{p_archived} archived{C.NC}"))
+
+    # Execution status
+    if plan and plan not in ('none', 'null', ''):
+        lines.append(hline())
+
+        # Status indicator with spinner
+        status_displays = {
+            'executing': (C.GREEN, '●', 'RUNNING'),
+            'testing':   (C.YELLOW, '●', 'TESTING'),
+            'linting':   (C.YELLOW, '●', 'LINTING'),
+            'pushing':   (C.BLUE, '●', 'PUSHING'),
+            'done':      (C.GREEN, '✓', 'DONE'),
+            'failed':    (C.RED, '✗', 'FAILED'),
+        }
+        color, sym, label = status_displays.get(status, (C.YELLOW, '○', status.upper()[:8]))
+        spinner = spinners[tick % len(spinners)] if status in ('executing', 'testing', 'linting') else sym
+        lines.append(line(f"  {color}{spinner} {label:8s}{C.NC} {plan}"))
+
+        # Phase
+        if phase and phase not in ('null', '0', ''):
+            lines.append(line(f"  Phase:   {phase[:maxtext]}"))
+
+        # Task progress bar
+        if tasks_total > 0:
+            bar = progress_bar(tasks_done, tasks_total)
+            lines.append(line(f"  Tasks:   {bar}  {C.DIM}{tasks_done}/{tasks_total}{C.NC}"))
+
+        # Current task
+        if current_task and current_task not in ('null', ''):
+            lines.append(line(f"  Current: {C.BOLD}{current_task[:maxtext]}{C.NC}"))
+
+        # Last message
+        if last_msg and last_msg not in ('null', ''):
+            lines.append(line(f"  {C.DIM}{last_msg[:maxtext]}{C.NC}"))
+
+        # Thinking
+        if thinking and thinking not in ('null', ''):
+            lines.append(hline('┄', '┠', '┨'))
+            lines.append(line(f"  {C.YELLOW}> {thinking[:maxtext - 2]}{C.NC}"))
+
+        # Recent activity
+        if recent:
+            if not thinking:
+                lines.append(hline('┄', '┠', '┨'))
+            for act in recent[-4:]:
+                act_text = safe_str(act)[:maxtext - 2]
+                lines.append(line(f"  {C.CYAN}>{C.NC} {act_text}"))
+
+        # Updated timestamp
+        if last_update and last_update not in ('null', ''):
+            lines.append(line(f"  {C.DIM}Updated: {last_update}{C.NC}"))
+
+    else:
+        lines.append(hline())
+        lines.append(line(f"  {C.DIM}No active execution{C.NC}"))
+
+    # Worktrees
+    if worktrees:
+        lines.append(hline('┄', '┠', '┨'))
+        lines.append(line(f"  {C.BOLD}Worktrees{C.NC}"))
+        for wt in worktrees[:3]:
+            wt_branch = safe_str(wt.get('branch'), '?')
+            wt_commit = safe_str(wt.get('last_commit'))[:maxtext - len(wt_branch) - 2]
+            wt_age = safe_str(wt.get('commit_age'))
+            lines.append(line(f"  {C.BLUE}{wt_branch}{C.NC} {wt_commit}"))
+            if wt_age:
+                lines.append(line(f"    {C.DIM}{wt_age}{C.NC}"))
+
+    # Open PRs
+    if open_prs:
+        lines.append(hline('┄', '┠', '┨'))
+        lines.append(line(f"  {C.BOLD}Open PRs{C.NC}"))
+        for pr in open_prs[:3]:
+            num = pr.get('number', '?')
+            title = safe_str(pr.get('title'))[:maxtext - 5]
+            lines.append(line(f"  {C.GREEN}#{num}{C.NC} {title}"))
+
+    # Footer
+    lines.append(hline('━', '┗', '┛'))
+    spinner_char = spinners[tick % len(spinners)] if status in ('executing', 'testing', 'linting') else ' '
+    lines.append(f"{C.DIM}  {spinner_char} Ctrl+C to exit | Refreshes every {REFRESH_INTERVAL}s{C.NC}")
+
+    print('\n'.join(lines))
+    sys.stdout.flush()
+
+def main():
+    print('\033[?25l', end='')  # Hide cursor
+    sys.stdout.flush()
+
+    def cleanup(sig=None, frame=None):
+        print('\033[?25h\033[H\033[J', end='')
+        sys.exit(0)
+
+    signal.signal(signal.SIGINT, cleanup)
+    signal.signal(signal.SIGTERM, cleanup)
+
+    data = get_data()
+    last_fetch = time.time()
+    tick = 0
+
+    try:
+        while True:
+            now = time.time()
+            if now - last_fetch >= REFRESH_INTERVAL:
+                data = get_data()
+                last_fetch = now
+
+            render(data, tick)
+            tick += 1
+            time.sleep(1)
+    except KeyboardInterrupt:
+        cleanup()
+
+if __name__ == '__main__':
+    main()

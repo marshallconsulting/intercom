@@ -1,0 +1,179 @@
+#!/usr/bin/env bash
+# cdd-pulse - Health check for CDD plan execution agents
+# Usage: cdd-pulse [--json]
+# Works in any CDD repo (looks for workflow/plans/, .claude/worktrees/)
+# Reads from .claude/execution-status.json (written by execute agent)
+
+cd "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null || { echo "Not in a git repo"; exit 1; }
+
+JSON_MODE=false
+[[ "$1" == "--json" ]] && JSON_MODE=true
+
+STATUS_FILE=".claude/execution-status.json"
+WORKTREE_DIR=".claude/worktrees"
+PLANS_DIR="workflow/plans"
+
+# Collect data
+repo_name=$(basename "$(pwd)")
+branch=$(git branch --show-current 2>/dev/null)
+timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+# Find active worktrees
+active_worktrees=()
+worktree_details='[]'
+if [[ -d "$WORKTREE_DIR" ]]; then
+    for wt in "$WORKTREE_DIR"/*/; do
+        [[ -d "$wt" ]] || continue
+        wt_name=$(basename "$wt")
+        active_worktrees+=("$wt_name")
+        wt_branch=$(git -C "$wt" branch --show-current 2>/dev/null || echo "?")
+        wt_commit=$(git -C "$wt" log -1 --format="%h %s" 2>/dev/null || echo "")
+        wt_time=$(git -C "$wt" log -1 --format="%ar" 2>/dev/null || echo "")
+        worktree_details=$(echo "$worktree_details" | jq \
+            --arg name "$wt_name" --arg branch "$wt_branch" \
+            --arg commit "$wt_commit" --arg time "$wt_time" \
+            '. + [{ name: $name, branch: $branch, last_commit: $commit, commit_age: $time }]')
+    done
+fi
+
+# Count plans by state
+plans_ready=$(find "$PLANS_DIR" -maxdepth 1 -name "*.md" 2>/dev/null | wc -l | tr -d ' ')
+plans_active_fs=$(find "$PLANS_DIR/active" -name "*.md" 2>/dev/null | wc -l | tr -d ' ')
+plans_archived=$(find "$PLANS_DIR/archived" -name "*.md" 2>/dev/null | wc -l | tr -d ' ')
+
+# Active count: filesystem is source of truth
+worktree_count=${#active_worktrees[@]}
+if [[ ${#active_worktrees[@]} -eq 1 && -z "${active_worktrees[0]}" ]]; then
+    worktree_count=0
+fi
+plans_active=$((plans_active_fs > 0 ? plans_active_fs : worktree_count))
+
+# Adjust ready count
+plans_ready=$((plans_ready > 0 ? plans_ready : 0))
+
+# Active plan names
+active_plan_names=""
+if [[ -d "$PLANS_DIR/active" ]]; then
+    active_plan_names=$(ls "$PLANS_DIR/active/"*.md 2>/dev/null | xargs -I{} basename {} .md | tr '\n' ', ' | sed 's/,$//')
+fi
+# Also include worktree branch names as active plan hints
+for wt_name in "${active_worktrees[@]}"; do
+    wt_branch=$(git -C "$WORKTREE_DIR/$wt_name" branch --show-current 2>/dev/null | sed 's/^worktree-//')
+    if [[ -n "$wt_branch" && "$wt_branch" != "?" ]]; then
+        [[ -n "$active_plan_names" ]] && active_plan_names="$active_plan_names, "
+        active_plan_names="$active_plan_names$wt_branch"
+    fi
+done
+
+# Read status file if it exists
+if [[ -f "$STATUS_FILE" ]]; then
+    status_data=$(cat "$STATUS_FILE")
+else
+    status_data='{}'
+fi
+
+# Check for open PRs
+remote_url=$(git remote get-url origin 2>/dev/null || echo "")
+repo_slug=""
+if [[ "$remote_url" =~ github.com[:/](.+/.+)(\.git)?$ ]]; then
+    repo_slug="${BASH_REMATCH[1]%.git}"
+fi
+
+open_prs="[]"
+if [[ -n "$repo_slug" ]]; then
+    open_prs=$(gh pr list --repo "$repo_slug" --state open --json number,title,headRefName 2>/dev/null || echo "[]")
+fi
+
+if $JSON_MODE; then
+    echo "$status_data" | jq \
+        --arg repo "$repo_name" \
+        --arg branch "$branch" \
+        --arg timestamp "$timestamp" \
+        --argjson worktrees "$worktree_details" \
+        --argjson open_prs "$open_prs" \
+        --arg plans_ready "$plans_ready" \
+        --arg plans_active "$plans_active" \
+        --arg plans_archived "$plans_archived" \
+        --arg active_plans "$active_plan_names" \
+        '. + {
+            repo: $repo,
+            main_branch: $branch,
+            timestamp: $timestamp,
+            worktrees: $worktrees,
+            open_prs: $open_prs,
+            plans: {
+                ready: ($plans_ready | tonumber),
+                active: ($plans_active | tonumber),
+                archived: ($plans_archived | tonumber),
+                active_names: $active_plans
+            }
+        }'
+else
+    # Text display
+    printf "  \033[1m\033[36mCDD PULSE\033[0m  %s%*s\n" "$repo_name" $((30 - ${#repo_name})) "$(date '+%H:%M:%S')"
+    echo "  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "  Branch:     $branch"
+
+    # Plan counts
+    printf "  Plans:      \033[0;32m%s ready\033[0m  \033[0;33m%s active\033[0m  \033[2m%s archived\033[0m\n" \
+        "$plans_ready" "$plans_active" "$plans_archived"
+
+    # Show status from file
+    plan=$(echo "$status_data" | jq -r '.plan // "none"')
+    status=$(echo "$status_data" | jq -r '.status // "idle"')
+    phase=$(echo "$status_data" | jq -r '.current_phase // ""')
+    tasks_done=$(echo "$status_data" | jq -r '.tasks_done // 0')
+    tasks_total=$(echo "$status_data" | jq -r '.tasks_total // 0')
+    last_msg=$(echo "$status_data" | jq -r '.last_message // ""')
+    last_update=$(echo "$status_data" | jq -r '.last_update // ""')
+
+    if [[ "$plan" != "none" && "$plan" != "null" ]]; then
+        echo ""
+        case "$status" in
+            executing) printf "  \033[0;32m● EXECUTING\033[0m  %s\n" "$plan" ;;
+            testing)   printf "  \033[0;33m● TESTING\033[0m    %s\n" "$plan" ;;
+            linting)   printf "  \033[0;33m● LINTING\033[0m    %s\n" "$plan" ;;
+            pushing)   printf "  \033[0;34m● PUSHING\033[0m    %s\n" "$plan" ;;
+            done)      printf "  \033[0;32m✓ DONE\033[0m       %s\n" "$plan" ;;
+            failed)    printf "  \033[0;31m✗ FAILED\033[0m     %s\n" "$plan" ;;
+            *)         printf "  \033[0;33m○ %s\033[0m  %s\n" "$status" "$plan" ;;
+        esac
+
+        [[ -n "$phase" && "$phase" != "null" ]] && echo "  Phase:      $phase"
+
+        if [[ "$tasks_total" -gt 0 ]]; then
+            bar_width=15
+            filled=$(( tasks_done * bar_width / tasks_total ))
+            empty=$(( bar_width - filled ))
+            printf "  Tasks:      \033[0;32m%s\033[2m%s\033[0m  \033[1m%s/%s\033[0m\n" \
+                "$(printf '█%.0s' $(seq 1 $filled 2>/dev/null))" \
+                "$(printf '░%.0s' $(seq 1 $empty 2>/dev/null))" \
+                "$tasks_done" "$tasks_total"
+        fi
+
+        [[ -n "$last_msg" && "$last_msg" != "null" ]] && printf "  \033[2m%s\033[0m\n" "${last_msg:0:55}"
+        [[ -n "$last_update" && "$last_update" != "null" ]] && printf "  \033[2mUpdated: %s\033[0m\n" "$last_update"
+    fi
+
+    # Worktrees
+    if [[ ${#active_worktrees[@]} -gt 0 ]]; then
+        echo ""
+        echo "  Worktrees:"
+        for wt_name in "${active_worktrees[@]}"; do
+            wt_path="$WORKTREE_DIR/$wt_name"
+            wt_branch=$(git -C "$wt_path" branch --show-current 2>/dev/null || echo "?")
+            wt_commit=$(git -C "$wt_path" log -1 --format="%h %s" 2>/dev/null | cut -c1-40 || echo "")
+            printf "    \033[0;34m%s\033[0m  %s\n" "$wt_branch" "$wt_commit"
+        done
+    fi
+
+    # Open PRs
+    pr_count=$(echo "$open_prs" | jq 'length' 2>/dev/null || echo 0)
+    if [[ "$pr_count" -gt 0 ]]; then
+        echo ""
+        echo "  Open PRs:"
+        echo "$open_prs" | jq -r '.[] | "    #\(.number) \(.title)"'
+    fi
+
+    echo "  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+fi

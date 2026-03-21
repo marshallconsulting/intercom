@@ -58,8 +58,17 @@ intercom/
 │   ├── intercom.ts     # The MCP server
 │   ├── package.json
 │   └── test/
-└── docs/
-    └── quick-start.md
+├── skills/
+│   └── cdd/            # CDD pipeline skills
+│       ├── accept-proposal/
+│       ├── audit-plan/
+│       ├── execute-plan/
+│       └── reconcile/
+├── research/           # Distilled external knowledge
+├── transcripts/        # Cleaned design session records
+├── docs/
+│   └── quick-start.md
+└── experiments/        # POCs and throwaway explorations
 ```
 
 ## Working in This Repo
@@ -73,12 +82,6 @@ CLAUDE_AGENT_ID=my-agent bun run source/intercom.ts
 
 # Run tests
 cd source && bun test
-
-# Lint
-cd source && bun run lint
-
-# Format
-cd source && bun run format
 ```
 
 ## Key Concepts
