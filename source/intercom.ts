@@ -30,7 +30,8 @@ import {
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js'
 
-const INTERCOM_DIR = join(homedir(), '.claude', 'intercom')
+const INTERCOM_DIR =
+  process.env.INTERCOM_DIR || join(homedir(), '.claude', 'intercom')
 const AGENT_ID =
   process.env.CLAUDE_AGENT_ID || process.env.AGENT_ID || 'unknown'
 const POLL_INTERVAL_MS = 2000
