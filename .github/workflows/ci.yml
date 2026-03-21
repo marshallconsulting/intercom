@@ -1,0 +1,11 @@
+name: CI
+on: [push, pull_request]
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: cd source && bun install
+      - run: cd source && bun run lint
+      - run: cd source && bun test
