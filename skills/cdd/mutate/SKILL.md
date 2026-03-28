@@ -4,6 +4,8 @@ description: Mutate traits from one artifact onto another. Reads theirs and ours
 args: "ours=<path> theirs=<path> [-sync]"
 ---
 
+> **Requires CDD 2025.03.27.** This skill expects the repo to use Context-Driven Delivery folder structure (`workflow/proposals/`, `workflow/plans/`, `specs/`). See `CDD.md` at the repo root.
+
 # /mutate - Trait-Based Artifact Mutation
 
 Read theirs. Read ours. Identify the traits in theirs worth adopting. Rewrite ours to incorporate them.
