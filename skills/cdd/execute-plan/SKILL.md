@@ -65,18 +65,28 @@ Use the Agent tool with **both** `isolation: "worktree"` and `run_in_background:
 2. Project context from CLAUDE.md (test commands, code location, etc.)
 3. **The full playbook contents** (paste the rules verbatim, not just "read the playbook"). The agent cannot be trusted to read files it wasn't told about.
 4. Any audit findings or context the agent needs
+5. **Dev log instructions.** Tell the agent to write `execution.log` at its worktree root. Its first action must be writing the initial log entry.
 
 ```
 Agent(
-  prompt: "<plan details + CLAUDE.md context + PLAYBOOK CONTENTS + audit context>",
+  prompt: "<plan details + CLAUDE.md context + PLAYBOOK CONTENTS + audit context + dev log instructions>",
   isolation: "worktree",
   run_in_background: true
 )
 ```
 
-**Why paste the playbook?** The agent instructions say "read the playbook if it exists," but agents frequently skip optional reads when they have enough context to start coding. Pasting the rules into the prompt makes them impossible to skip.
+**Why paste the playbook?** Agents frequently skip optional reads when they have enough context to start coding. Pasting the rules into the prompt makes them impossible to skip.
 
-### Step D: Tell the User
+### Step D: Tell the User How to Monitor
+
+After launching, find the worktree path the agent is running in:
+
+```bash
+# The newest worktree is the one we just spawned
+ls -dt .claude/worktrees/*/
+```
+
+Tell the user: `tail -f .claude/worktrees/<agent-dir>/execution.log` to monitor.
 
 Confirm the agent was launched and they're free to keep working. That's it. You're done.
 
@@ -104,13 +114,22 @@ Also read `CLAUDE.md` at the repo root for project conventions: language, test c
 
 If the plan doesn't have clear steps or acceptance criteria, stop and return: "This plan needs more detail before I can execute it. It's missing [X]."
 
-### Step 2: Rename Branch
+### Step 2: Start the Dev Log and Rename Branch
 
-**Rename the branch** from the auto-generated worktree name to a human-readable name derived from the plan filename:
+**The dev log is mandatory.** Your very first action must be to create the log file and write the first entry:
+
+```bash
+echo "[$(date '+%H:%M')] Agent started. Reading plan." >> execution.log
+```
+
+This file lives at the root of your worktree. The user is watching it via `tail -f`. You will append to it throughout the entire execution. **Every phase start, every decision, every test result, every commit gets a log line.** If the user runs `tail -f` and sees nothing, you have failed. See "Dev Log" section below for format and examples.
+
+**Then rename the branch** from the auto-generated worktree name to a human-readable name derived from the plan filename:
 
 ```bash
 # e.g., plan file "delivery-receipts.md" -> branch "delivery-receipts"
 git branch -m $(git rev-parse --abbrev-ref HEAD) <plan-name-without-extension>
+echo "[$(date '+%H:%M')] Branch renamed to <plan-name>" >> execution.log
 ```
 
 The plan is already in `workflow/plans/active/` on main. The launcher moved it there before spawning you. Do NOT try to move it again.
@@ -130,14 +149,18 @@ Show the task list briefly, then proceed immediately. Do NOT ask for confirmatio
 
 For each task, in order:
 1. Mark it `in_progress` with `TaskUpdate`
-2. **Update execution status** (see Status Reporting below)
-3. Do the work (write code, edit files, create tests)
-4. Run the project's test command (check CLAUDE.md for the command)
-5. If tests fail, fix the issue before moving on
-6. Mark it `completed` with `TaskUpdate`
-7. **Update execution status** with new task count
-8. Commit after each phase or logical group (not one giant commit at the end)
-9. Move to the next task
+2. **Log to the dev log:** `echo "[$(date '+%H:%M')] Starting: <task description>" >> execution.log`
+3. **Update execution status** (see Status Reporting below)
+4. Do the work (write code, edit files, create tests)
+5. **Log decisions:** if you make a non-obvious choice, log why
+6. Run the project's test command (check CLAUDE.md for the command)
+7. **Log test results:** `echo "[$(date '+%H:%M')] Tests: <count> pass, <count> fail" >> execution.log`
+8. If tests fail, log the failure, fix the issue, log the fix
+9. Mark it `completed` with `TaskUpdate`
+10. **Update execution status** with new task count
+11. Commit after each phase or logical group (not one giant commit at the end)
+12. **Log the commit:** `echo "[$(date '+%H:%M')] Committed: <commit message summary>" >> execution.log`
+13. Move to the next task
 
 **Key rules during execution:**
 - Follow the project's CLAUDE.md conventions
@@ -208,13 +231,12 @@ Return the PR URL to the user.
 After pushing and creating the PR, clean up the worktree so the branch isn't locked when the user tries to check it out.
 
 ```bash
-# Get the main repo root (parent of .claude/worktrees/)
-MAIN_REPO=$(git -C . rev-parse --show-superproject-working-tree 2>/dev/null || echo "")
+REPO_ROOT=$(dirname "$(git rev-parse --git-common-dir)")
 WORKTREE_PATH=$(pwd)
 
-if [ -n "$MAIN_REPO" ]; then
-  # We're in a worktree. Remove it from the main repo.
-  cd "$MAIN_REPO"
+if [ "$REPO_ROOT" != "$WORKTREE_PATH" ]; then
+  echo "[$(date '+%H:%M')] Cleaning up worktree. Done." >> execution.log
+  cd "$REPO_ROOT"
   git worktree remove --force "$WORKTREE_PATH"
 fi
 ```
@@ -281,6 +303,49 @@ Common patterns by stack. Check CLAUDE.md for the actual commands.
 | Code location | `source/` | `src/` | `src/` |
 | Test location | `source/test/` | `tests/` | `__tests__/` or `*.test.ts` |
 | Config | `package.json` | `pyproject.toml` | `package.json` |
+
+## Dev Log (MANDATORY)
+
+**The dev log is not optional.** It is the user's only window into what you're doing. You initialize it in Step 2 and write to it throughout execution. If the user runs `tail -f` and sees nothing, you have failed.
+
+The log file is `execution.log` at the root of your worktree. Every append is one bash command:
+
+```bash
+echo "[$(date '+%H:%M')] your message here" >> execution.log
+```
+
+**When to log (all of these, every time):**
+- Starting a phase or task
+- What you're thinking/deciding (especially non-obvious choices)
+- Creating or modifying a file and why
+- Test results (pass count, or failure details)
+- Committing
+- Anything that didn't go as planned
+- Completion or failure
+
+**Examples:**
+
+```
+[11:20] Starting Phase 1: Rewriting report-rate-limits.sh
+[11:20] Removing jq parsing, writing raw stdin to inbox/<ts>_<session_id>.json
+[11:21] Phase 2: Creating sessions migration
+[11:21] Made repo_id nullable - unknown repos get nil, keeps things simple
+[11:22] Using bigint for token columns - can exceed int max in long sessions
+[11:22] Running db:migrate... clean
+[11:23] Phase 3: Renaming RateLimitImportService -> UsageImportService
+[11:24] Decision: deleting processed files rather than moving to processed/ - simpler, no disk growth
+[11:25] Tests: 410 runs, 0 failures
+[11:28] Lint: clean
+[11:29] Phase 4: Replacing TokenTrackingService
+[11:29] Summaries controller generate action now aggregates from Session records
+[11:30] Tests: 2 failures in summaries_controller_test - fixing
+[11:31] Fixed: test was creating TokenTrackingService expectations, switched to Session factory data
+[11:32] Tests: 412 runs, 0 failures
+```
+
+**Keep it natural.** Write like a developer would in a work log. Short lines. No JSON, no structure to maintain. Just what you're doing, why, and what happened.
+
+**Monitoring:** `tail -f .claude/worktrees/<agent-dir>/execution.log` from another terminal. The launcher tells the user the exact path.
 
 ## Status Reporting
 

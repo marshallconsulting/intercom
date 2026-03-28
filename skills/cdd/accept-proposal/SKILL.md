@@ -32,6 +32,8 @@ Read the proposal file. Extract:
 
 If the proposal doesn't have a clear problem statement or proposed change, stop and tell the user: "This proposal needs more detail before it can be accepted. It's missing [X]."
 
+Check whether the proposal includes a **Codebase Context** section (or equivalent: "Current Implementation", "What Exists Today", etc.). If present, verify the key file paths still exist (they may be stale). If missing, add one before proceeding - use the Explore agent to find relevant files and add a `## Codebase Context` section with the same format as `/create-proposal` produces. This front-loads the survey work and saves significant time in Step 3.
+
 ### Step 2: Move to Accepted
 
 1. Move the proposal to `workflow/proposals/accepted/` with today's date prefix:
@@ -44,7 +46,9 @@ git mv workflow/proposals/foo.md workflow/proposals/accepted/YYYY-MM-DD-foo.md
 
 ### Step 3: Survey the Codebase
 
-Use the Explore agent (or Grep/Glob directly for small proposals) to find all files affected by the proposal. The proposal's "What Changes" section is a starting point, but verify against the actual codebase. Don't trust the proposal blindly.
+If the proposal has a Codebase Context section, use it as your starting point. Verify that the file paths still exist and the descriptions are still accurate. Extend as needed for areas the proposal didn't cover.
+
+If the proposal lacks codebase context, survey from scratch using the Explore agent (or Grep/Glob directly for small proposals). The proposal's "What Changes" section is a starting point, but verify against the actual codebase. Don't trust the proposal blindly.
 
 For each affected area, note:
 - Which files need changes
@@ -78,6 +82,14 @@ The plan must include:
 - Every file mentioned should actually exist (verify with Glob)
 - Acceptance criteria should be verifiable with a command or grep
 - No vague items like "update references" without listing which references
+
+8. **Where to Start**: A non-authoritative section at the end with codebase pointers from the survey. Clearly marked as potentially stale. Organized as:
+   - Core flow to trace (the main code path affected)
+   - Views that should/shouldn't change (for verification)
+   - Existing test files (what to update/delete/create)
+   - Example data or config files
+
+   This gives the execution agent a head start without being prescriptive. Mark it: "These are pointers from the codebase survey at plan creation time. Files may have changed by execution time. Verify before acting."
 
 ### Step 5: Output Summary
 
