@@ -3,7 +3,7 @@ name: nightshift
 description: Execute all queued plans sequentially overnight using stacked PRs. Picks up plans from workflow/plans/, executes each one in a worktree, runs tests, opens PRs stacked on each other, and moves to the next. Skips stuck plans with notes. Use when the user says "/nightshift", "execute all plans", "run overnight", or wants batch plan execution.
 ---
 
-> **Requires CDD v1.** This skill expects the repo to use Context-Driven Development folder structure (`workflow/proposals/`, `workflow/plans/`, `specs/`). See `CDD.md` at the repo root.
+> **Requires CDD 2025.03.27.** This skill expects the repo to use Context-Driven Delivery folder structure (`workflow/proposals/`, `workflow/plans/`, `specs/`). See `CDD.md` at the repo root.
   
 # /nightshift - Overnight Batch Plan Execution
 

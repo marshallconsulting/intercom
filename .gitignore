@@ -3,4 +3,5 @@ internal/
 intercom.md
 .mcp.json
 .claude/
+workflow/ideas/
 node_modules/

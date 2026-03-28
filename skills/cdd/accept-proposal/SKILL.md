@@ -4,7 +4,7 @@ description: Accept a proposal and create an execution plan from it. Moves the p
 args: "[path to proposal file, e.g. workflow/proposals/delivery-receipts.md]"
 ---
 
-> **Requires CDD v1.** This skill expects the repo to use Context-Driven Development folder structure (`workflow/proposals/`, `workflow/plans/`, `specs/`). See `CDD.md` at the repo root.
+> **Requires CDD 2025.03.27.** This skill expects the repo to use Context-Driven Delivery folder structure (`workflow/proposals/`, `workflow/plans/`, `specs/`). See `CDD.md` at the repo root.
 
 # /accept-proposal - Accept Proposal and Create Plan
 

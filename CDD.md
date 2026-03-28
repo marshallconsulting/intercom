@@ -1,10 +1,10 @@
-# Context-Driven Development (CDD 2025.03.27)
+# Context-Driven Delivery (CDD 2025.03.27)
 
-A methodology for building software with AI agents. The repo accumulates context that makes every future decision and every future agent session better. This isn't a framework or a standard. It's a workflow that works for us and may work for you. Adapt the folder structure, skills, and conventions described here to fit your own context.
+A methodology for delivering work products with AI agents. Software, documents, research, analysis, whatever the output. The repo accumulates context that makes every future decision and every future agent session better. This isn't a framework or a standard. It's a workflow that works for us and may work for you. Adapt the folder structure, skills, and conventions described here to fit your own context.
 
 ## The Idea
 
-Every piece of thinking gets written down in the repo. Decisions, plans, domain knowledge, research, design conversations, experiments. The repo isn't just where the code lives. It's the complete picture of the project: what was decided, why, what was built, and what's next.
+Every piece of thinking gets written down in the repo. Decisions, plans, domain knowledge, research, design conversations, experiments. The repo isn't just where the deliverables live. It's the complete picture of the project: what was decided, why, what was built, and what's next.
 
 This accumulated context is what makes the methodology work. Agents build well because the context is there. Humans make good decisions because the context is there. Nobody reconstructs the picture from Jira tickets, Slack threads, and tribal knowledge. The repo IS the picture.
 
@@ -20,7 +20,9 @@ The repo organizes context into layers, each serving a different purpose:
 | **Research** | External knowledge: platforms, competitors, patterns, vendor evaluations | Anyone making informed decisions |
 | **Transcripts** | Design conversations: the thinking that shaped the specs | Anyone who needs the "how we got here" |
 | **Playbook** | How to build: patterns, anti-patterns, conventions, guardrails | Agents executing plans, humans reviewing code |
+| **Data** | Structured project data: datasets, samples, reference tables, fixtures | Agents processing, humans analyzing |
 | **Experiments** | Prototypes and POCs: things we tried, what we learned | Anyone evaluating feasibility |
+| **Ideas** | Raw sparks: uncommitted, unstructured, not yet worth a proposal | The person who had the idea |
 | **Code** | The implementation: how things actually work | Agents building, humans debugging |
 
 No single layer tells the whole story. Together they form a complete picture that any agent or human can navigate.
@@ -30,6 +32,21 @@ No single layer tells the whole story. Together they form a complete picture tha
 Each conversation, each decision, each implementation leaves behind artifacts that make the next round easier. A proposal written today becomes context for a plan tomorrow. A plan executed this week becomes an archived decision record next week. Research gathered for one feature informs the next proposal.
 
 This is the flywheel: the more context in the repo, the better agents perform, the better the artifacts they produce, the more context accumulates.
+
+### Context Stratification
+
+Not all context is equal. Layers form a natural hierarchy based on how authoritative and durable they are:
+
+| Tier | Layers | Authority | Lifecycle |
+|------|--------|-----------|-----------|
+| **1. Specs** | `specs/` | Highest. Domain authority. | Updated deliberately, survives refactors. |
+| **2. Research** | `research/` | High. External ground truth. | Updated when the world changes. |
+| **3. Data** | `data/` | Medium. Factual but scoped. | Updated per project phase or dataset refresh. |
+| **4. Ideas** | `workflow/ideas/` | Lowest. Disposable sparks. | Uncommitted. Promoted to proposals or discarded. |
+
+When context conflicts, higher tiers win. A spec overrides a research note that contradicts it (update the research, or update the spec if the world changed). An idea that contradicts a spec is just wrong until the spec is revised through the proposal pipeline.
+
+Ideas are intentionally uncommitted. They live in `workflow/ideas/`, which is gitignored. They're scratch space for thoughts that aren't ready for the proposal pipeline. Most ideas die here, and that's the point. The ones that survive get promoted to proposals.
 
 ### Specs and Code: Shared Authority
 
@@ -57,13 +74,15 @@ project/
 ├── specs/              # Domain knowledge (what and why)
 │   └── sandbox/        # Half-baked spec ideas, domain sketches
 ├── workflow/           # The decision and execution pipeline
+│   ├── ideas/          # Raw sparks (gitignored, uncommitted scratch space)
 │   ├── proposals/      # Decision pipeline (draft -> accepted)
 │   │   └── accepted/   # Decision records with date prefix
 │   └── plans/          # Execution plans (ready for audit or execution)
 │       ├── active/     # Currently being executed (hands off)
 │       └── archived/   # Completed plans with execution notes
+├── data/               # Structured project data (datasets, samples, fixtures)
 ├── playbook/           # How to build (patterns, guardrails, conventions)
-├── source/             # All application code
+├── source/             # All application code (or other deliverables)
 ├── skills/             # CDD skills (optional, for repos that develop skills locally)
 ├── research/           # Distilled external knowledge
 ├── transcripts/        # Cleaned design session records
@@ -73,17 +92,17 @@ project/
 
 `specs/` contains domain knowledge and exploratory sketches (`sandbox/`). `workflow/` contains the pipeline that produces and maintains everything else.
 
-**Why separate `source/` from root?** Keeps context and code at the same level. Agents can read specs without navigating into the app. Humans can browse the domain model without opening a code editor.
+**Why separate `source/` from root?** Keeps context and deliverables at the same level. Agents can read specs without navigating into the app. Humans can browse the domain model without opening a code editor. For non-software projects, `source/` holds whatever the primary deliverables are: reports, designs, analysis outputs.
 
 ## The Idea Pipeline
 
-At its simplest, an idea moves through three stages:
+At its simplest, an idea moves through four stages:
 
 ```
-proposal -> plan -> source
+ideas (uncommitted) → proposals → plans → source
 ```
 
-A **proposal** describes what you want to build and why. A **plan** breaks it into phases an agent can execute. **Source** is the code that gets written. That's the core loop.
+An **idea** is a raw spark, kept in `workflow/ideas/` (gitignored). When it's worth pursuing, it becomes a **proposal** that describes what you want to build and why. A **plan** breaks it into phases an agent can execute. **Source** is the deliverable that gets produced. That's the core loop. Not every idea becomes a proposal, and not every proposal becomes a plan. The funnel is intentional.
 
 ### Adding More Structure
 
@@ -274,6 +293,8 @@ Everything an agent can derive from reading the code:
 |-----------|----------|------------------|
 | **System** (e.g., architecture.md) | How components connect, data flow, design decisions with reasoning | Type definitions, exact file paths, API call syntax |
 | **Feature** (e.g., billing.md) | What the feature does, why, the domain rules that govern it | Implementation details the code makes obvious |
+| **Team** (e.g., roles.md, org.md) | Who does what, agent personas, team structure, responsibilities | Implementation details, individual task assignments |
+| **Domain** (e.g., glossary.md, taxonomy.md) | Canonical terms, classifications, domain-specific vocabulary | Code-level type definitions, API schemas |
 | **Sandbox** (specs/sandbox/) | Rough ideas, domain sketches, things being explored | Anything polished enough to be a real spec |
 
 ## Getting Started

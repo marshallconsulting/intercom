@@ -4,7 +4,7 @@ You're an agent in a repo that doesn't use CDD yet. This guide helps you underst
 
 ## What CDD Is (30-Second Version)
 
-Context-Driven Development is a way of organizing a repo so that every decision, plan, and piece of domain knowledge is written down alongside the code. The repo becomes the complete picture of the project, not just the code. Agents build better because the context is there. Humans make better decisions because the context is there.
+Context-Driven Delivery is a way of organizing a repo so that every decision, plan, and piece of domain knowledge is written down alongside the code. The repo becomes the complete picture of the project, not just the code. Agents build better because the context is there. Humans make better decisions because the context is there.
 
 The full methodology is described in [CDD.md](CDD.md). You don't need to read all of it right now. This guide tells you what to start with.
 
@@ -87,6 +87,27 @@ Create a folder for distilled external knowledge. One file per topic. Not raw no
 mkdir research
 ```
 
+### "I have datasets or reference material agents need"
+
+**Start with: `data/`**
+
+Create a `data/` folder for structured project data: sample datasets, reference tables, fixtures, anything agents or humans need to process or analyze. This is factual, scoped context that sits between research (external knowledge) and code (implementation).
+
+```
+mkdir data
+```
+
+### "I have half-baked ideas I want to capture without cluttering the repo"
+
+**Start with: `workflow/ideas/`**
+
+Create `workflow/ideas/` and add it to `.gitignore`. This is scratch space for raw sparks that aren't ready for the proposal pipeline. Jot down ideas in markdown files. When one matures, promote it to a proposal. Most ideas die here, and that's fine.
+
+```
+mkdir -p workflow/ideas
+echo 'workflow/ideas/' >> .gitignore
+```
+
 ### "We have design sessions and the context gets lost"
 
 **Start with: `transcripts/`**
@@ -112,7 +133,7 @@ Your CLAUDE.md should reference CDD.md so agents know it exists:
 
 ```markdown
 ## Methodology
-This repo uses Context-Driven Development. See [CDD.md](CDD.md) for the workflow.
+This repo uses Context-Driven Delivery. See [CDD.md](CDD.md) for the workflow.
 ```
 
 ## Installing Skills (Optional)

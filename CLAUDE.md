@@ -55,6 +55,7 @@ intercom/
 │   ├── protocol.md       # Message format, delivery semantics
 │   └── sandbox/          # Half-baked spec ideas
 ├── workflow/
+│   ├── ideas/            # Raw sparks (gitignored, uncommitted)
 │   ├── proposals/        # Features waiting to be built
 │   │   └── accepted/     # Approved proposals with date prefix
 │   └── plans/
@@ -72,6 +73,7 @@ intercom/
 │       ├── reconcile/
 │       ├── mutate/
 │       └── nightshift/
+├── data/                 # Structured project data (datasets, samples, fixtures)
 ├── playbook/             # Coding patterns and guardrails
 ├── research/             # Distilled external knowledge
 ├── transcripts/          # Cleaned design session records
