@@ -4,7 +4,7 @@ description: Pre-merge spec reconciliation. Diffs the branch against main, reads
 args: "[branch name or plan path, e.g. delivery-receipts or workflow/plans/archived/delivery-receipts.md]"
 ---
 
-> **Requires CDD v1.** This skill expects the repo to use Context-Driven Development folder structure (`workflow/proposals/`, `workflow/plans/`, `specs/`). See `CDD.md` at the repo root.
+> **Requires CDD 2025.03.27.** This skill expects the repo to use Context-Driven Delivery folder structure (`workflow/proposals/`, `workflow/plans/`, `specs/`). See `CDD.md` at the repo root.
 
 # /reconcile - Pre-Merge Spec Reconciliation
 

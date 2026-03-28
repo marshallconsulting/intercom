@@ -166,3 +166,22 @@ None required. All files exist and are ready.
 ### Blockers
 
 None identified.
+
+## Execution Notes
+
+**Executed:** 2026-03-28
+**Branch:** cdd-to-cdp
+**Agent:** intercom-dev (Opus 4.6)
+
+### Summary
+
+All 6 phases completed successfully. Documentation-only changes, no source code modified.
+
+### Phase Results
+
+1. **Configuration:** Added `workflow/ideas/` to `.gitignore`.
+2. **CDD.md Rewrite:** Title, opening paragraph, Context Layers table (added Data + Ideas rows), new Context Stratification section, Repo Structure diagram (added `data/` and `workflow/ideas/`), Idea Pipeline (extended with ideas stage), Spec Types table (added Team + Domain types). "Development" replaced with "Delivery" throughout.
+3. **CLAUDE.md:** Updated repo structure tree with `data/` and `workflow/ideas/`.
+4. **Quick-Start and README:** Changed "Development" to "Delivery" in both files. Added `data/` and `ideas/` starting point sections to cdd-quick-start.md.
+5. **Skills Headers:** Updated 5 of 6 SKILL.md files (accept-proposal, audit-plan, execute-plan, nightshift, reconcile). Mutate skill had no CDD v1 header or Development reference to change.
+6. **Test and Lint:** 11 tests pass, lint clean, zero grep hits for "Context-Driven Development" outside the plan file.

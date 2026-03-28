@@ -4,7 +4,7 @@ description: Audit a plan's readiness before execution. Checks sample data, depe
 args: "[path to plan file, e.g. workflow/plans/delivery-receipts.md]"
 ---
 
-> **Requires CDD v1.** This skill expects the repo to use Context-Driven Development folder structure (`workflow/proposals/`, `workflow/plans/`, `specs/`). See `CDD.md` at the repo root.
+> **Requires CDD 2025.03.27.** This skill expects the repo to use Context-Driven Delivery folder structure (`workflow/proposals/`, `workflow/plans/`, `specs/`). See `CDD.md` at the repo root.
 
 # /audit-plan - Plan Readiness Audit
 

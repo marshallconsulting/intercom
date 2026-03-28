@@ -4,7 +4,7 @@ description: Execute an implementation plan. Takes a plan from workflow/plans/, 
 args: "[path to plan file, e.g. workflow/plans/delivery-receipts.md]"
 ---
 
-> **Requires CDD v1.** This skill expects the repo to use Context-Driven Development folder structure (`workflow/proposals/`, `workflow/plans/`, `specs/`). See `CDD.md` at the repo root.
+> **Requires CDD 2025.03.27.** This skill expects the repo to use Context-Driven Delivery folder structure (`workflow/proposals/`, `workflow/plans/`, `specs/`). See `CDD.md` at the repo root.
 
 # /execute-plan - Execute an Implementation Plan
 
