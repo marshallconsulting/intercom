@@ -1,4 +1,4 @@
-# Context-Driven Development
+# Context-Driven Development (CDD 2025.03.27)
 
 A methodology for building software with AI agents. The repo accumulates context that makes every future decision and every future agent session better. This isn't a framework or a standard. It's a workflow that works for us and may work for you. Adapt the folder structure, skills, and conventions described here to fit your own context.
 
