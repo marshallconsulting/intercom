@@ -21,11 +21,11 @@ If no argument is provided, scan `workflow/plans/` for plans (excluding `active/
 
 ---
 
-## Part 1: What YOU Do (the caller)
+## YOU ARE THE LAUNCHER, NOT THE EXECUTOR
 
-**You are the orchestrator.** You do NOT execute the plan yourself. You prepare the repo, then spawn a subagent to do the work in isolation. The subagent handles everything end-to-end: implementation, testing, push, and PR.
+**Do not execute the plan inline.** Your only job is to prepare main and launch a background agent. Do not create tasks, write code, or edit files beyond the steps below.
 
-### 1a. Pick the Plan
+### Step A: Pick the Plan
 
 Read the plan file. Verify:
 - It has clear phases and acceptance criteria
@@ -33,7 +33,7 @@ Read the plan file. Verify:
 
 If the plan isn't ready, stop and tell the user.
 
-### 1b. Commit Plan and Move to Active on Main
+### Step B: Commit Plan and Move to Active on Main
 
 First, ensure the plan file is committed to main. Untracked plans cause `git mv` failures and also mean other agents can't see the plan in the repo. This commit also acts as a lock: once it's on main, other agents won't pick it up.
 
@@ -56,41 +56,39 @@ git push
 
 The push is important: it makes the lock visible to agents in other repos or worktrees.
 
-### 1c. Launch the Execute Agent
+### Step C: Read the Playbook and Launch the Execution Agent
 
-Spawn a subagent with **both** `isolation: "worktree"` **and** `run_in_background: true`. This gives the agent its own copy of the repo and frees the main conversation so the user can keep working.
+**Before launching**, read `playbook/` if it exists. The playbook contains coding conventions, size rules, and patterns that the execution agent MUST follow. You need to read it yourself so you can include its contents in the agent prompt. The agent runs in an isolated worktree and only knows what you tell it.
+
+Use the Agent tool with **both** `isolation: "worktree"` and `run_in_background: true`. The agent prompt MUST include:
+1. The plan path and phase details
+2. Project context from CLAUDE.md (test commands, code location, etc.)
+3. **The full playbook contents** (paste the rules verbatim, not just "read the playbook"). The agent cannot be trusted to read files it wasn't told about.
+4. Any audit findings or context the agent needs
 
 ```
-Agent tool call:
-  isolation: "worktree"
+Agent(
+  prompt: "<plan details + CLAUDE.md context + PLAYBOOK CONTENTS + audit context>",
+  isolation: "worktree",
   run_in_background: true
-  prompt: <the full execution instructions from Part 2 below, with plan details filled in>
+)
 ```
 
-**You MUST set `run_in_background: true`.** The whole point of worktree execution is that it runs independently. If you run it in the foreground, you block the user's conversation for the entire execution.
+**Why paste the playbook?** The agent instructions say "read the playbook if it exists," but agents frequently skip optional reads when they have enough context to start coding. Pasting the rules into the prompt makes them impossible to skip.
 
-**Include in the prompt:**
-- The plan path: `workflow/plans/active/<plan>.md`
-- A reminder to read CLAUDE.md for project conventions
-- All the instructions from Part 2 below
+### Step D: Tell the User
 
-You will be notified when the agent completes. Relay the PR URL and results to the user.
+Confirm the agent was launched and they're free to keep working. That's it. You're done.
 
-### 1d. After the Agent Completes
-
-When notified that the agent finished:
-1. Relay the PR URL and summary to the user
-2. Clean up any leftover local branches from the worktree (the worktree directory is cleaned up automatically, but the local branch may linger):
-
-```bash
-git branch -D <branch-name>  # safe — the work is on origin now
-```
+**Why this matters:** Executing inline blocks the user's conversation for the entire duration. The worktree gives the agent its own branch and copy of the repo. Background mode frees the user immediately.
 
 ---
 
-## Part 2: What the SUBAGENT Does (in the worktree)
+## Agent Instructions
 
-Everything below is for the execute agent running in the worktree. Copy these instructions into the agent prompt.
+Everything below this line is for the **spawned execution agent**, not the launcher. Copy the relevant parts into the agent's prompt.
+
+---
 
 ### Step 1: Read the Plan and CLAUDE.md
 
@@ -108,17 +106,21 @@ If the plan doesn't have clear steps or acceptance criteria, stop and return: "T
 
 ### Step 2: Rename Branch
 
-Rename the branch from the auto-generated worktree name to a human-readable name derived from the plan filename:
+**Rename the branch** from the auto-generated worktree name to a human-readable name derived from the plan filename:
 
 ```bash
-git branch -m $(git branch --show-current) <plan-name-without-extension>
+# e.g., plan file "delivery-receipts.md" -> branch "delivery-receipts"
+git branch -m $(git rev-parse --abbrev-ref HEAD) <plan-name-without-extension>
 ```
+
+The plan is already in `workflow/plans/active/` on main. The launcher moved it there before spawning you. Do NOT try to move it again.
 
 ### Step 3: Create Tasks
 
-Use `TaskCreate` to create one task per phase from the plan. Each task should have:
+Use `TaskCreate` to create one task per discrete step from the plan. Each task should have:
 - A clear, imperative subject
 - A description with enough detail to execute without re-reading the plan
+- An activeForm for the spinner
 
 Set up dependencies with `addBlockedBy` if tasks must be sequential.
 
@@ -135,24 +137,26 @@ For each task, in order:
 6. Mark it `completed` with `TaskUpdate`
 7. **Update execution status** with new task count
 8. Commit after each phase or logical group (not one giant commit at the end)
+9. Move to the next task
 
 **Key rules during execution:**
 - Follow the project's CLAUDE.md conventions
-- Write tests for new code
+- Write tests for new code (TDD preferred)
 - Don't over-engineer beyond what the plan specifies
 - If blocked, stop and return with what you accomplished and what blocked you
 
-### Step 5: Final Verification
+### Step 5: Final Verification (MUST PASS BEFORE PUSHING)
 
-After all tasks complete, run the same checks CI will run. **Do NOT push until these pass.**
+After all tasks complete, run the same checks CI will run. **Do NOT push or open a PR until these pass.**
 
 1. Run the full test suite. All tests must pass.
 2. Run the project's linter with autofix if configured. Fix any remaining violations.
-3. Commit any lint fixes.
-4. Run `git diff main --stat` to review what changed.
-5. Show the user a summary of what was built.
+3. If the project has security scanners (brakeman, bundler-audit), run those too.
+4. Commit any lint fixes.
+5. Run `git diff main --stat` to review what changed.
+6. Show the user a summary of what was built.
 
-**If tests or linting fail, fix them before proceeding.**
+**If tests or linting fail, fix them before proceeding to Step 6.** A PR with failing CI wastes review time.
 
 ### Step 6: Update Specs
 
@@ -164,13 +168,13 @@ Check the plan for any "Specs to Write" section and any existing specs that the 
 2. If an existing spec describes behavior that changed, update it to match what was actually built.
 3. Read each affected spec file in `specs/` and compare against the code. If they diverge, update the spec.
 
-**Do NOT skip this step.** Stale specs are worse than no specs.
+**Do NOT skip this step.** Stale specs are worse than no specs because they mislead future agents.
 
 ### Step 7: Archive the Plan
 
-1. **Update acceptance criteria checkboxes** in the plan to reflect what was completed.
+1. **Append an "Execution Notes" section** documenting what actually happened: assumptions made, deviations from the plan, gotchas encountered.
 
-2. **Append an "Execution Notes" section** documenting what actually happened: assumptions made, deviations from the plan, gotchas encountered.
+2. **Update acceptance criteria checkboxes** in the plan to reflect what was completed.
 
 3. Move the plan to the archive:
 
@@ -197,7 +201,31 @@ EOF
 )"
 ```
 
-### Step 9: Report Results
+Return the PR URL to the user.
+
+### Step 9: Clean Up Worktree
+
+After pushing and creating the PR, clean up the worktree so the branch isn't locked when the user tries to check it out.
+
+```bash
+# Get the main repo root (parent of .claude/worktrees/)
+MAIN_REPO=$(git -C . rev-parse --show-superproject-working-tree 2>/dev/null || echo "")
+WORKTREE_PATH=$(pwd)
+
+if [ -n "$MAIN_REPO" ]; then
+  # We're in a worktree. Remove it from the main repo.
+  cd "$MAIN_REPO"
+  git worktree remove --force "$WORKTREE_PATH"
+fi
+```
+
+**Why this matters:** If the worktree is left behind, `git checkout <branch>` from the main repo fails with "already checked out" errors. The user then has to manually clean up before they can test the PR branch. Always clean up after yourself.
+
+### Step 10: Update Status Files (if applicable)
+
+Update `_status.md` for any spec folders the plan touched. If no `_status.md` exists for an affected spec, create one.
+
+### Step 11: Report Results
 
 Return a summary to the caller:
 - The **PR URL**
@@ -224,12 +252,22 @@ workflow/plans/plan.md           Ready. Audit can check it. Execute can pick it 
        ▼  (Part 1: caller moves to active)
 workflow/plans/active/plan.md    In flight. Subagent working in worktree.
        │
-       ▼  (Step 6: subagent archives with notes)
+       ▼  (Step 7: subagent archives with notes)
 workflow/plans/archived/plan.md  Done. Decision record with execution notes.
        │
-       ▼  (Step 7: subagent pushes and opens PR)
+       ▼  (Step 8: subagent pushes and opens PR)
 origin/<branch>                  PR open for review.
 ```
+
+## Execution Notes (Lessons from Prior Runs)
+
+- **Worktree is preferred.** Keeps main clean for other agents working in parallel.
+- **Commit per phase**, not one giant commit. Makes the PR reviewable.
+- **Move to active/ first.** This is the signal to other agents that the plan is being worked on.
+- **Archive path** is `workflow/plans/archived/`, not `specs/archive/_plans/`.
+- **Read CLAUDE.md** for project-specific commands. Don't assume test/lint commands.
+- **Clean up the worktree** after pushing. If left behind, `git checkout <branch>` fails from the main repo with "already checked out" errors.
+- **Paste the playbook** into the agent prompt. Don't rely on the agent reading it on its own.
 
 ## Project-Specific Reference
 
@@ -290,3 +328,5 @@ STATUSEOF
 **Important:** If running in a worktree, write to the **main repo root**, not the worktree directory. The repo root path is the parent of `.claude/worktrees/`. Use `git -C . rev-parse --show-superproject-working-tree` or hardcode based on the worktree path.
 
 **On completion:** Set status to `done` with final task counts. On failure, set to `failed` with the error in `last_message`.
+
+**Monitoring:** Run `cdd-pulse-tui` in another terminal to watch progress live.

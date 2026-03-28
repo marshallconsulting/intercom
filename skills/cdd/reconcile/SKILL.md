@@ -128,7 +128,7 @@ After presenting the report, ask the user:
 
 **Skip this step for ad-hoc branches with no plan.**
 
-If the plan exists and is in `archived/` or `active/`, append a "Post-Execution Reconciliation" section to it documenting what changed after the plan was marked complete:
+If the plan exists and is in `archived/` or `done/`, append a "Post-Execution Reconciliation" section to it documenting what changed after the plan was marked complete:
 
 ```markdown
 ## Post-Execution Reconciliation

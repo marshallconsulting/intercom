@@ -25,19 +25,29 @@ If no argument is provided, list available plans in `workflow/plans/` (excluding
 
 ### Step 1: Read the Plan
 
-Read the plan file. Extract:
-- **Phases/steps** and what each one needs to execute
-- **Referenced specs** (read them for context on what's being built)
-- **Referenced code** (existing files the plan builds on or modifies)
-- **Data requirements** (test data, sample inputs, fixtures)
-- **External dependencies** (APIs, credentials, libraries)
-- **Open questions** listed in the plan
+Read the plan file yourself. Extract the plan path and enough context to brief the subagent. You need:
+- The full plan file path
+- The list of phases/steps and what each one needs to execute
+- Referenced specs (read them for context on what's being built)
+- Referenced code (existing files the plan builds on or modifies)
+- Data requirements (test data, sample inputs, fixtures)
+- External dependencies (APIs, credentials, libraries)
+- Open questions listed in the plan
 
-If the plan doesn't have clear phases or acceptance criteria, note that as a blocker.
+If the plan doesn't have clear phases or acceptance criteria, note that as a blocker and stop.
 
-### Step 2: Audit Each Category
+### Step 2: Launch Audit Subagent
 
-Run the five audit checks below. Use subagents in parallel where possible to speed this up. Each check should verify against the actual filesystem and codebase, not just trust what the plan says.
+Launch an **Explore** subagent in the background to perform the full audit investigation. The subagent does all file verification, dependency checks, and gap analysis, then returns structured results to you.
+
+**Use `Agent` with `subagent_type: "Explore"` and `run_in_background: true`.** While the audit runs, tell the user it's running in the background.
+
+Give the subagent a prompt that includes:
+1. The full plan content (paste it into the prompt so the subagent has it)
+2. Instructions to perform all six audit checks (2a-2f below)
+3. Instructions to return structured results in the format specified below
+
+**Subagent audit checks to perform:**
 
 #### 2a. Input Data
 
@@ -109,7 +119,45 @@ The step should:
 
 If the plan is missing this step, add it as the final phase before archiving, and note it in the Revision Log. Mark it as a required step in the acceptance criteria.
 
-### Step 3: Write the Readiness Audit
+**Required return format from the subagent:**
+
+Tell the subagent to structure its response as:
+
+```
+## Audit Results
+
+### Input Data
+| Input | Status | Notes |
+...
+
+### Dependencies
+| Dependency | Status | Notes |
+...
+
+### Open Questions
+| # | Question | Blocking? | Notes |
+...
+
+### POC Gaps
+| # | Assumption | Suggested POC | Result |
+...
+
+### Blockers
+[list or "None identified"]
+
+### Spec Update
+[which specs need updating, whether the plan already covers this]
+
+### Recommended Plan Changes
+[any phases to add/modify, acceptance criteria to add, etc.]
+
+### Verdict
+[READY / NEEDS HUMAN INPUT / NOT READY] with one-sentence summary
+```
+
+### Step 3: Process Audit Results and Write the Readiness Audit
+
+When the subagent returns, process its results. Apply any recommended plan changes (add missing phases, fix references, add acceptance criteria). Then write the audit to the plan file.
 
 Append a `## Readiness Audit` section to the plan file. If a previous audit already exists, **update it in place**: add a new row to the Audit Log, update the Verdict and all sections below to reflect current state. Do NOT delete the Audit Log history.
 

@@ -1,0 +1,128 @@
+# CDD v2: Context-Driven Delivery
+
+## Problem
+
+CDD is framed around software development. The folder structure and terminology assume the work product is code. But the methodology works for any project that accumulates context over time: research engagements, marketing campaigns, consulting deliverables, internal knowledge bases.
+
+Two structural gaps exist across every CDD project we reviewed:
+
+1. **No home for imported external context.** Every project has documents, data dumps, vendor materials, or legacy files that agents need as context but that aren't specs (decided truths) or research (actively investigated). They end up scattered or undocumented.
+
+2. **No private scratchpad in the workflow.** Half-baked ideas either go in specs/sandbox (too formal), root-level memos (messy), or stay in someone's head. There's no uncommitted space to think before proposing.
+
+## Proposal
+
+Two changes:
+
+1. Reframe CDD as **Context-Driven Delivery** (same acronym, broader scope)
+2. Add two new context layers: `data/` and `workflow/ideas/`
+
+Everything else stays the same. No renames. specs/, source/, playbook/, research/, transcripts/, experiments/, workflow/ all keep their current names and roles.
+
+### Change 1: Development → Delivery
+
+"Delivery" is broader than "Development." It works for any project that delivers a work product, not just software. A research engagement delivers a report. A marketing campaign delivers assets. A consulting project delivers recommendations. The methodology is the same: accumulate context, make better decisions, ship better work.
+
+### Change 2: New folder — `data/`
+
+Externally-sourced context. Documents, Q&A, mockups, legacy platform descriptions, vendor materials. Things imported into the project for reference, not authored within the project workflow.
+
+Key distinction from other context layers:
+- **specs** = decided truths authored and maintained within the project
+- **research** = actively investigated findings, agent-driven or human-driven
+- **data** = imported external documents, converted to searchable markdown
+
+`data/` solves the onboarding problem: when a project already has an existing folder of PowerPoints, Word docs, Excel files, and PDFs, those get converted to markdown and dropped into `data/`. The agent can search and reference them. The originals can live elsewhere.
+
+Real gaps this fills (from reviewing active CDD projects):
+- **marshall-time** has external data sources (TIMESHEET.log, clients.json, Google Calendar) with no documentation home in the repo
+- **argentic_agents** has strategic memos and vendor documents that don't fit specs or research
+- **legalfund.com** has regulatory documents, competitive analysis dumps, and investor materials from external sources
+
+Future possibility: `data/` could synchronize with external sources (Teams channels, SharePoint folders, shared drives) to keep external context up to date automatically.
+
+### Change 3: New folder — `workflow/ideas/`
+
+Personal scratchpad. Uncommitted, gitignored. A place to think out loud, sketch half-baked concepts, and talk through problems before they're ready for a proposal.
+
+- Nothing in `ideas/` gets committed
+- When an idea is ready to share, it graduates to a proposal
+- `.gitignore` includes `workflow/ideas/`
+
+This extends the workflow pipeline:
+
+```
+ideas/ (personal, uncommitted) → proposals/ (shared) → plans/ (execution-ready)
+```
+
+### Context Stratification
+
+CDD v2 formalizes the idea that context has layers of confidence and authority:
+
+| Layer | Confidence | Description |
+|-------|-----------|-------------|
+| **Specs** | Highest | Decided truths. If wrong, something must change. |
+| **Research** | High | Investigated findings. Verified but may evolve. |
+| **Data** | Medium | Imported external context. Useful but not verified against project truth. |
+| **Ideas** | Lowest | Loose thoughts. Personal, uncommitted, exploratory. |
+
+This isn't new structure. It's naming what's already implicit. Agents and humans already treat specs differently from research differently from raw documents. Making the hierarchy explicit helps new projects set up correctly and helps agents weigh context appropriately.
+
+### What specs/ can now contain
+
+With the broader "Delivery" framing, specs/ naturally accommodates content types that felt awkward under "Development":
+
+- **System specs** — architecture, design decisions, domain rules (same as before)
+- **Team specs** — `team.md` describing people, roles, responsibilities
+- **Domain specs** — business rules, constraints, regulatory requirements
+- **Feature specs** — what features do, why they exist, the rules governing them
+- **Sandbox** — `specs/sandbox/` for half-baked spec sketches (same as before)
+
+### Updated Repo Structure
+
+```
+project/
+├── CDD.md              # Methodology
+├── CLAUDE.md           # Project config
+├── specs/              # Decided truths (what and why)
+│   └── sandbox/        # Half-baked spec sketches
+├── workflow/           # Decision and execution pipeline
+│   ├── ideas/          # Personal scratchpad (gitignored, NEW)
+│   ├── proposals/      # Decision pipeline
+│   │   └── accepted/   # Decision records with date prefix
+│   └── plans/          # Execution plans
+│       ├── active/     # Currently executing
+│       └── archived/   # Completed with notes
+├── source/             # Application code / work product
+├── data/               # Imported external context (NEW)
+├── playbook/           # How to build (patterns, guardrails)
+├── skills/             # CDD skills (optional)
+├── research/           # Investigated findings
+├── transcripts/        # Design session records
+├── docs/               # External-facing content
+└── experiments/        # POCs and throwaway explorations
+```
+
+### What Stays the Same
+
+- All existing folder names (specs/, source/, playbook/, research/, transcripts/, experiments/)
+- The pipeline: propose → accept → audit → execute → reconcile → merge
+- Plan lifecycle (filesystem state machine)
+- Playbook as living document
+- Mutation across repos
+- Skills automation
+- All core concepts (context accumulation, shared authority, two audiences)
+
+## Impact
+
+- CDD.md rewritten: subtitle changes from "Development" to "Delivery", context stratification section added, data/ and ideas/ documented, content generalized for non-software projects
+- CLAUDE.md updated to reference data/ and workflow/ideas/
+- .gitignore updated to include `workflow/ideas/`
+- Quick-start guide updated
+- Skills: minor updates to reference new folders where relevant
+- Existing repos: no migration needed. Add data/ and workflow/ideas/ when useful.
+
+## Open Questions
+
+- Does `data/` need subdirectory conventions, or is it flat by default?
+- Should there be a skill for importing external documents into `data/` (convert to markdown, add metadata)?
