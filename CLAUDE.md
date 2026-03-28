@@ -55,6 +55,7 @@ intercom/
 │   ├── protocol.md       # Message format, delivery semantics
 │   └── sandbox/          # Half-baked spec ideas
 ├── workflow/
+│   ├── ideas/            # Personal scratchpad (gitignored)
 │   ├── proposals/        # Features waiting to be built
 │   │   └── accepted/     # Approved proposals with date prefix
 │   └── plans/
@@ -64,6 +65,7 @@ intercom/
 │   ├── intercom.ts       # The MCP server
 │   ├── package.json
 │   └── test/
+├── data/                 # Imported external context (documents, vendor materials)
 ├── skills/
 │   └── cdd/              # CDD pipeline skills (source of truth)
 │       ├── accept-proposal/
