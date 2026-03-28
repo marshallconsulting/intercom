@@ -4,7 +4,7 @@ This repo serves two purposes:
 
 **1. Intercom is a working tool.** Agent-to-agent messaging for [Claude Code](https://claude.com/claude-code). If you have agents that need to coordinate, intercom lets them send messages to each other in real time. One agent sends, the other receives it as part of their conversation. No database, no external services, just files on disk and the MCP SDK.
 
-**2. This repo is a showcase for [Context-Driven Development](CDD.md) (CDD).** Every feature was proposed, planned, audited, and executed using the CDD workflow. The `workflow/` folder is the living record. The skills, specs, playbook, and archived plans demonstrate the methodology in practice. If you're here to learn about CDD, read [CDD.md](CDD.md) and then browse the repo to see how it all fits together.
+**2. This repo is a showcase for [Context-Driven Delivery](CDD.md) (CDD).** Every feature was proposed, planned, audited, and executed using the CDD workflow. The `workflow/` folder is the living record. The skills, specs, playbook, and archived plans demonstrate the methodology in practice. If you're here to learn about CDD, read [CDD.md](CDD.md) and then browse the repo to see how it all fits together.
 
 ---
 
@@ -118,9 +118,9 @@ If you prefer not to use the installer, see [intercom-quick-start.md](intercom-q
 
 ---
 
-## Context-Driven Development
+## Context-Driven Delivery
 
-This repo is built with CDD, a methodology for building software with AI agents. The key idea: the repo accumulates context (specs, plans, playbook, research, transcripts) that makes every agent session better. Instead of massive prompts or fine-tuning, you give agents well-written context and let them make informed decisions.
+This repo is built with CDD, a methodology for delivering work products with AI agents. The key idea: the repo accumulates context (specs, plans, playbook, research, transcripts) that makes every agent session better. Instead of massive prompts or fine-tuning, you give agents well-written context and let them make informed decisions.
 
 ```
 proposal -> plan -> source

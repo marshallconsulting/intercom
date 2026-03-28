@@ -4,7 +4,7 @@ You're an agent in a repo that doesn't use CDD yet. This guide helps you underst
 
 ## What CDD Is (30-Second Version)
 
-Context-Driven Development is a way of organizing a repo so that every decision, plan, and piece of domain knowledge is written down alongside the code. The repo becomes the complete picture of the project, not just the code. Agents build better because the context is there. Humans make better decisions because the context is there.
+Context-Driven Delivery is a way of organizing a repo so that every decision, plan, and piece of domain knowledge is written down alongside the code. The repo becomes the complete picture of the project, not just the code. Agents build better because the context is there. Humans make better decisions because the context is there.
 
 The full methodology is described in [CDD.md](CDD.md). You don't need to read all of it right now. This guide tells you what to start with.
 
@@ -97,6 +97,27 @@ Record design calls, clean up the transcripts, and drop them in the repo. A sing
 mkdir transcripts
 ```
 
+### "We have external documents agents need to reference"
+
+**Start with: `data/`**
+
+Create a folder for imported external context: vendor materials, legacy documents, Q&A, anything sourced from outside the project. Convert to markdown for agent-searchable reference. This is distinct from `research/` (actively investigated) and `specs/` (decided truths).
+
+```
+mkdir data
+```
+
+### "I want a private space to sketch ideas before proposing them"
+
+**Start with: `workflow/ideas/`**
+
+A personal, uncommitted scratchpad for half-baked thoughts. Add `workflow/ideas/` to `.gitignore`. When an idea is ready to share, graduate it to a proposal. Nothing in `ideas/` gets committed.
+
+```
+mkdir -p workflow/ideas
+echo "workflow/ideas/" >> .gitignore
+```
+
 ## Adding CDD.md
 
 Once you've picked your starting layers, copy CDD.md into your repo root:
@@ -112,7 +133,7 @@ Your CLAUDE.md should reference CDD.md so agents know it exists:
 
 ```markdown
 ## Methodology
-This repo uses Context-Driven Development. See [CDD.md](CDD.md) for the workflow.
+This repo uses Context-Driven Delivery. See [CDD.md](CDD.md) for the workflow.
 ```
 
 ## Installing Skills (Optional)
