@@ -118,6 +118,7 @@ Launch the agent immediately after writing the prompt file:
 
 ```
 Agent tool with:
+  subagent_type: "general-purpose"
   isolation: "worktree"
   run_in_background: true
   prompt: |
@@ -128,6 +129,8 @@ Agent tool with:
 ```
 
 The Agent tool call must be minimal. All the real content is in the prompt file.
+
+**`subagent_type: "general-purpose"` is required.** Do not omit it.
 
 **Why write to a file first?** Composing the prompt inline in the Agent tool call takes minutes and is a black box. Writing to `.claude/<plan-name>-agent-prompt.md` makes it transparent, reviewable, and the launch instant.
 
@@ -163,19 +166,62 @@ Confirm the agent was launched and they're free to keep working.
 
 When the background agent completes, write a usage summary to `.claude/plan_usage/<plan-name>.md`. Create the directory if needed.
 
-The agent result message includes token counts and cost data from the session. Write whatever usage data is available from the return message:
+**Pull the real numbers from the subagent JSONL transcripts, not from the Agent return message.** The Agent return surfaces a single "tokens" figure that is `cache_creation_input_tokens` only — it omits `cache_read_input_tokens`, which is billed at 10% of input rate but is the dominant component of long runs and routinely under-reports actual quota load by 50–100×.
+
+The transcripts live at:
+
+```
+~/.claude/projects/<project-slug>/<parent-session-id>/subagents/agent-<id>.jsonl
+```
+
+`<project-slug>` is the cwd with `/` replaced by `-` (e.g. `-Users-doug-data-intercom`). `<parent-session-id>` is the session you (the launcher) are running in.
+
+Run this snippet to compute correct per-agent totals. It dedupes by `message.id` because one assistant turn that emits N parallel `tool_use` blocks writes N duplicated `usage` records, and naively summing the column over-counts those turns by N:
+
+```bash
+python3 <<'PY' <subagents-dir>
+import json, glob, os, sys
+for f in sorted(glob.glob(sys.argv[1] + "/agent-*.jsonl")):
+    seen = {}
+    for line in open(f):
+        try: d = json.loads(line)
+        except: continue
+        m = d.get("message",{}) or {}
+        if m.get("role") != "assistant": continue
+        mid, u = m.get("id"), m.get("usage")
+        if mid and u and mid not in seen: seen[mid] = u
+    g = lambda k: sum((u.get(k) or 0) for u in seen.values())
+    inp, out = g("input_tokens"), g("output_tokens")
+    cc, cr = g("cache_creation_input_tokens"), g("cache_read_input_tokens")
+    meta = json.load(open(f.replace('.jsonl', '.meta.json'))) if os.path.exists(f.replace('.jsonl','.meta.json')) else {}
+    desc = f"{meta.get('agentType','?')}: {meta.get('description','?')}"
+    print(f"{os.path.basename(f).replace('.jsonl',''):<30} {desc[:50]:<50} turns={len(seen):>4} in={inp:>6} cc={cc:>8} cr={cr:>11} out={out:>6} total={inp+out+cc+cr:>11}")
+PY
+```
+
+Write the artifact like this:
 
 ```markdown
 # <plan-name>
 **Executed:** <date and time>
 **Duration:** <from execution.log first and last timestamps>
-**Result:** <success or failure, PR number if created>
+**Result:** <success or failure, PR link if created>
 
 ## Usage
-<token counts, cost, cache stats, or whatever is visible from the agent result>
+
+| Agent | Turns | Input | Cache create | Cache read | Output | **Total** |
+|-------|------:|------:|-------------:|-----------:|-------:|----------:|
+| Execution agent      | <n> | <n> | <n> | <n> | <n> | <n> |
+| Code review          | <n> | <n> | <n> | <n> | <n> | <n> |
+| <other subagents>    | <n> | <n> | <n> | <n> | <n> | <n> |
+
+**Total real tokens across all agents:** <sum>
+
+> `cache_read` is the dominant component and is the right number to compare
+> against the 5-hour usage window. `cache_creation` alone is misleading.
 ```
 
-This is a best-effort capture. Don't query external systems. Just write what you can see from the agent's return. If the agent failed or returned no usage data, still write the file with what you have (date, duration, result).
+If the agent failed or you can't locate the JSONL, still write the file with what you have (date, duration, result, link to where the transcript should be).
 
 ---
 
@@ -355,14 +401,18 @@ Specs are the source of truth. If the code changed, specs must match. Check the 
    | Metric | Value |
    |--------|-------|
    | Duration | Xm Ys |
-   | Tokens | N |
+   | Input tokens | N |
+   | Cache create tokens | N |
+   | Cache read tokens | N |
+   | Output tokens | N |
+   | Total tokens | N |
    | Tool calls | N |
    | Commits | N |
    | Files changed | N |
    | Tests added | N |
    | PR | #NN |
    ```
-   Get duration from the first and last execution.log timestamps. Get files changed from `git diff main --stat`. Get commits from `git log main..HEAD --oneline | wc -l`. Count test files you created/modified for tests added.
+   Get duration from the first and last execution.log timestamps. Get files changed from `git diff main --stat`. Get commits from `git log main..HEAD --oneline | wc -l`. Count test files you created/modified for tests added. **Report all four token components separately** — a single "tokens" number is misleading because `cache_read` is the dominant component on long runs and is invisible if you only quote the figure the Agent return surfaces (which is `cache_create`). The launcher's Step 7 has the full snippet for computing these from the JSONL transcript.
 4. Update acceptance criteria checkboxes.
 5. Move to archive:
 
