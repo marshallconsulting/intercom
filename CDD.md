@@ -27,6 +27,54 @@ The repo organizes context into layers, each serving a different purpose:
 
 No single layer tells the whole story. Together they form a complete picture that any agent or human can navigate.
 
+### The Specificity Gradient
+
+Each layer operates at a different level of specificity. The idea sharpens as it moves through the pipeline, from a vague direction to exact implementation:
+
+| Layer | Specificity | What it sounds like |
+|-------|-------------|---------------------|
+| **Blueprint** | 3/10 | "We're building a messaging system between agents, file-based, MCP transport" |
+| **Proposal** | 5/10 | "Messages are JSON files in per-agent inboxes, delivery uses MCP channel notifications, registry tracks active agents" |
+| **Plan** | 8/10 | "Phase 1: create intercom.ts with MCP server scaffold and inbox polling. Phase 2: implement send tool, registry, list_agents." |
+| **Code** | 10/10 | The actual implementation. Every edge case, every line. |
+
+This gradient is deliberate. Each layer adds specificity that the previous layer intentionally left out:
+
+- **Blueprints don't specify data models** because the model might change during proposal discussion.
+- **Proposals don't specify file paths** because the plan needs to survey the codebase first.
+- **Plans don't specify variable names** because the code will discover the right abstractions during implementation.
+
+Trying to be too specific too early wastes effort. A blueprint that reads like a plan is over-specified: it locks in decisions before the thinking has been done. A plan that reads like a blueprint is under-specified: an agent can't execute it without guessing.
+
+The right question at each layer:
+
+- **Blueprint:** "Is the direction clear enough to write proposals?"
+- **Proposal:** "Is the design clear enough to write a plan?"
+- **Plan:** "Is the plan clear enough for an agent to execute without asking questions?"
+- **Code:** "Does it work?"
+
+Complex features naturally produce multiple proposals from one blueprint, and multiple plans from one proposal. A blueprint for "build the messaging system" might generate proposals for the transport layer, the registry, the delivery semantics, and the CLI integration. Each proposal might produce one or more plans. Each plan is a unit of work an agent can execute in one session.
+
+### Artifacts Are Shared, Not Restated
+
+A blueprint doesn't need to carry much detail on its own because it can reference research and experiments that go deeper. A blueprint might say "file-based transport, see `research/mcp-channels.md`" and that research file has the full protocol analysis, edge cases, and vendor comparison. The blueprint stays lean. The depth lives in supporting artifacts.
+
+This referencing works at every layer, not just the top. Proposals reference research and experiments. Plans reference all of the above. The execution agent follows the plan and reads anything it points to when it needs the detail.
+
+```
+Blueprint ──references──> research/, experiments/
+    │
+Proposal ──references──> research/, experiments/, specs/
+    │
+Plan ──references──> all of the above
+    │
+Execute agent ──reads──> plan + anything the plan or proposal references
+```
+
+The key insight: each layer adds its own specificity but doesn't absorb and restate everything from the layers it references. The proposal doesn't copy-paste research findings, it cites them. The plan doesn't re-explain the experiment results, it says "see `experiments/inbox-poc/`". The artifacts are durable repo assets that any layer can reach back to at any time.
+
+This is what keeps the gradient honest. A proposal author reads the blueprint *and* the linked research, then synthesizes at the next specificity level. A plan author reads the proposal *and* can go back to the same research. The execution agent reads the plan *and* can follow references all the way back to the original research when it needs deep context. Nothing is lost between layers because nothing is packaged up and thrown away. It all stays in the repo.
+
 ### Why Context Accumulates
 
 Each conversation, each decision, each implementation leaves behind artifacts that make the next round easier. A proposal written today becomes context for a plan tomorrow. A plan executed this week becomes an archived decision record next week. Research gathered for one feature informs the next proposal.
@@ -230,16 +278,22 @@ Skills are Claude Code slash commands that encode repeatable workflows. Each ski
 
 ### Pipeline Skills
 
-These automate the core CDD workflow:
+These automate the core CDD workflow, ordered by when they typically run in the pipeline:
 
 | Skill | Purpose | Input | Output |
 |-------|---------|-------|--------|
+| `/bootstrap-specs` | Survey an existing codebase and generate first-draft specs | None (reads code) | New files in `specs/` |
+| `/create-proposal` | Draft a CDD proposal from a GitHub issue with codebase context | Issue URL | Proposal in `workflow/proposals/` |
+| `/refine-proposal` | Pressure-test a proposal: cross-reference specs/playbook, ask gap questions | Proposal file | Updated proposal with decisions captured |
+| `/answer` | Walk through a numbered question list one at a time with recommendations | None (reads conversation) | Decisions recorded in source doc |
 | `/accept-proposal` | Approve a proposal, survey codebase, write execution plan | Proposal file | Accepted proposal + plan in `workflow/plans/` |
-| `/audit-plan` | Verify plan readiness: deps, data, open questions, POC gaps | Plan file | Readiness audit appended to plan |
+| `/audit-plan` | Verify plan readiness: deps, data, open questions, POC gaps + experiments | Plan file | Readiness audit appended to plan |
 | `/execute-plan` | Implement a plan in a worktree: code, test, spec update, PR | Plan file | Branch with code + PR |
 | `/reconcile` | Diff branch vs specs and playbook, fix drift and capture new patterns | Branch (auto-detected) | Spec + playbook edits committed |
-| `/mutate` | Pull traits from one artifact onto another (theirs/ours) | Two file paths | Rewritten ours file |
 | `/nightshift` | Batch-execute all queued plans overnight as stacked PRs | Plans in `workflow/plans/` | Stack of PRs for morning review |
+| `/mutate` | Pull traits from one artifact onto another (theirs/ours) | Two file paths | Rewritten ours file |
+
+`/bootstrap-specs` is a one-time skill for adopting CDD into a repo with existing code. `/create-proposal`, `/refine-proposal`, and `/answer` form the proposal-shaping front of the pipeline. `/accept-proposal` through `/reconcile` is the build-and-merge backbone. `/nightshift` and `/mutate` are meta-skills that operate across the pipeline.
 
 None of these are required to use CDD. The folder structure and workflow work without any skills installed. Skills just automate what you'd otherwise do manually.
 

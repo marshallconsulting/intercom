@@ -17,7 +17,23 @@ Accept a design proposal, move it to the decision log, and generate an execution
 /accept-proposal workflow/proposals/telegram-bridge.md
 ```
 
-If no argument is provided, scan `workflow/proposals/` for draft proposals (excluding `accepted/` and `README.md`). If there's exactly one, proceed with it automatically. If there are multiple, use `AskUserQuestion` to let the user pick which one to accept. If there are none, tell the user there are no draft proposals.
+If no argument is provided, scan `workflow/proposals/` for draft proposals (excluding `accepted/` subdirectory and `README.md`). Then:
+
+- **Zero proposals:** Tell the user there are no draft proposals.
+- **One proposal:** Proceed with it automatically.
+- **Multiple proposals:** List the 5 most recent (sorted by file modification time, newest first) and ask the user to pick one. Format as a numbered list:
+
+```
+Which proposal should I accept?
+
+1. delivery-receipts.md (Apr 1)
+2. telegram-bridge.md (Mar 31)
+3. session-gap-periods.md (Mar 31)
+4. restore-jsonl-token-tracking.md (Mar 28)
+5. pg-dev-prod-split.md (Mar 28)
+```
+
+Wait for the user to respond with a number or name before proceeding.
 
 ## Instructions
 
@@ -32,6 +48,8 @@ Read the proposal file. Extract:
 
 If the proposal doesn't have a clear problem statement or proposed change, stop and tell the user: "This proposal needs more detail before it can be accepted. It's missing [X]."
 
+Check whether the proposal includes a **Codebase Context** section (or equivalent: "Current Implementation", "What Exists Today", etc.). If present, verify the key file paths still exist (they may be stale). If missing, add one before proceeding - use the Explore agent to find relevant files and add a `## Codebase Context` section with the same format as `/create-proposal` produces. This front-loads the survey work and saves significant time in Step 3.
+
 ### Step 2: Move to Accepted
 
 1. Move the proposal to `workflow/proposals/accepted/` with today's date prefix:
@@ -44,7 +62,9 @@ git mv workflow/proposals/foo.md workflow/proposals/accepted/YYYY-MM-DD-foo.md
 
 ### Step 3: Survey the Codebase
 
-Use the Explore agent (or Grep/Glob directly for small proposals) to find all files affected by the proposal. The proposal's "What Changes" section is a starting point, but verify against the actual codebase. Don't trust the proposal blindly.
+If the proposal has a Codebase Context section, use it as your starting point. Verify that the file paths still exist and the descriptions are still accurate. Extend as needed for areas the proposal didn't cover.
+
+If the proposal lacks codebase context, survey from scratch using the Explore agent (or Grep/Glob directly for small proposals). The proposal's "What Changes" section is a starting point, but verify against the actual codebase. Don't trust the proposal blindly.
 
 For each affected area, note:
 - Which files need changes
@@ -54,6 +74,8 @@ For each affected area, note:
 ### Step 4: Write the Plan
 
 Create `workflow/plans/<proposal-name>.md` using the same base name as the proposal (without the date prefix).
+
+**Multiple plans:** If the proposal is large enough to warrant multiple plans (the proposal or your survey may suggest this), create one plan per independently shippable chunk. Number them with a prefix: `1-sidebar-layout.md`, `2-widget-panels.md`, `3-claude-gauge.md`. The numbers indicate execution order. Plans with the same number can run in parallel. Include `**Depends on:**` in each plan that requires a prior plan to ship first.
 
 The plan must include:
 
@@ -78,6 +100,14 @@ The plan must include:
 - Every file mentioned should actually exist (verify with Glob)
 - Acceptance criteria should be verifiable with a command or grep
 - No vague items like "update references" without listing which references
+
+8. **Where to Start**: A non-authoritative section at the end with codebase pointers from the survey. Clearly marked as potentially stale. Organized as:
+   - Core flow to trace (the main code path affected)
+   - Views that should/shouldn't change (for verification)
+   - Existing test files (what to update/delete/create)
+   - Example data or config files
+
+   This gives the execution agent a head start without being prescriptive. Mark it: "These are pointers from the codebase survey at plan creation time. Files may have changed by execution time. Verify before acting."
 
 ### Step 5: Output Summary
 

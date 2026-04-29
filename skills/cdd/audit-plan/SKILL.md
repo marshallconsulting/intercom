@@ -27,12 +27,8 @@ If no argument is provided, list available plans in `workflow/plans/` (excluding
 
 Read the plan file yourself. Extract the plan path and enough context to brief the subagent. You need:
 - The full plan file path
-- The list of phases/steps and what each one needs to execute
-- Referenced specs (read them for context on what's being built)
-- Referenced code (existing files the plan builds on or modifies)
-- Data requirements (test data, sample inputs, fixtures)
-- External dependencies (APIs, credentials, libraries)
-- Open questions listed in the plan
+- The list of phases/steps
+- Referenced files, specs, and dependencies mentioned in the plan
 
 If the plan doesn't have clear phases or acceptance criteria, note that as a blocker and stop.
 
@@ -45,71 +41,39 @@ Launch an **Explore** subagent in the background to perform the full audit inves
 Give the subagent a prompt that includes:
 1. The full plan content (paste it into the prompt so the subagent has it)
 2. Instructions to perform all six audit checks (2a-2f below)
-3. Instructions to return structured results in the format specified below
+3. Instructions to return structured results in a specific format
 
 **Subagent audit checks to perform:**
 
 #### 2a. Input Data
-
-What sample data does the plan need? For each:
-- Does it exist at the expected path?
+- Does sample/test data exist at expected paths?
 - Is it synthetic and safe to commit?
 - Is there enough of it?
-- Are there answer keys / expected outputs for validation?
-- Does the test data connect to other test data?
+- Are there answer keys / expected outputs?
 
 #### 2b. Dependencies & Tools
-
-What libraries, APIs, and tools does the plan require? For each:
-- Is it installed? (e.g., `bun pm ls`, `python3 -c "import X"`)
-- Is it declared in package.json / pyproject.toml / requirements.txt?
-- Are credentials configured? (Check .env for required keys, don't print values)
-- Are prerequisite code artifacts in place? (e.g., "the plan extends intercom.ts, does intercom.ts exist and have the expected interface?")
+- Are required libraries installed and declared?
+- Are credentials configured? (check .env for keys, don't print values)
+- Do prerequisite code artifacts exist with expected interfaces?
 
 #### 2c. Open Questions
-
-Collect all unresolved decisions from:
-- The plan's own "Open Questions" section
-- Gaps discovered during the audit (things the plan assumes but doesn't verify)
-- Ambiguities in acceptance criteria
-
-Classify each as:
-- **Blocking** - Can't start execution without resolving this
-- **Non-blocking** - Can start, but will need to decide during execution
-- **Deferred** - Can be resolved after the plan is done
+Collect unresolved decisions from the plan and gaps discovered during audit. Classify each as Blocking / Non-blocking / Deferred.
 
 #### 2d. POC Gaps
-
-What assumptions hasn't the plan validated? Look for:
-- New integrations that haven't been tested
-- Format/data transformations where quality is unknown
-- Performance assumptions
-- Interfaces between components that don't exist yet
-
-For each gap, suggest a concrete, small POC to validate it (a single command, a quick script, a manual test).
-
-**When POC gaps are found, create experiments.** Don't just list them in a table and move on. For each gap that can be validated without human input, create a minimal experiment in `experiments/` that proves or disproves the assumption:
-
-- Name the file descriptively: `experiments/poc-channel-delivery-latency.ts`, `experiments/poc-cross-repo-inbox.sh`, etc.
-- The experiment should be self-contained and runnable. A single script, a short test file.
-- Include a comment at the top explaining what assumption it validates and what a passing result looks like.
-- After creating the experiment, **run it** if possible. Record the result in the POC Gaps table.
-- If the experiment can't be run automatically, note that in the table and leave it for the human.
-- Experiments that pass can be deleted or kept as reference. Experiments that fail are blockers.
+What assumptions hasn't the plan validated? For each gap, suggest a concrete small POC that could verify it. The subagent should NOT run the experiments itself. Instead, return a structured list of suggested experiments with:
+- What assumption needs validation
+- A concrete experiment description (what to fetch, parse, or test)
+- Why it matters (what changes in the plan if the assumption is wrong)
+- Estimated effort (quick = under 5 min, medium = 5-30 min, needs-live-data = requires specific timing/conditions)
 
 #### 2e. Blockers
-
-Hard blockers that prevent execution:
-- Missing files that the plan requires
-- Missing credentials or API access
-- Circular dependencies between phases
-- Plan references code or specs that don't exist
+Missing files, missing credentials, circular dependencies, references to nonexistent code/specs.
 
 #### 2f. Spec Update Step
 
 **This is critical. Stale specs are worse than no specs because they mislead future agents.**
 
-Every plan must include a step that updates specs in `specs/` to reflect what was actually built. Check whether the plan includes this. If it doesn't, **add one as a blocker** and note it in the Revision Log.
+Every plan must include a step that updates specs in `specs/` to reflect what was actually built. Check whether the plan includes this. List all spec files in `specs/` that the plan's changes would affect. If the plan is missing a spec update step, flag it as a required addition and note it in the Revision Log.
 
 The step should:
 
@@ -139,8 +103,9 @@ Tell the subagent to structure its response as:
 ...
 
 ### POC Gaps
-| # | Assumption | Suggested POC | Result |
+| # | Assumption | Experiment | Why It Matters | Effort |
 ...
+(Effort: quick / medium / needs-live-data)
 
 ### Blockers
 [list or "None identified"]
@@ -155,9 +120,79 @@ Tell the subagent to structure its response as:
 [READY / NEEDS HUMAN INPUT / NOT READY] with one-sentence summary
 ```
 
+### Step 2.5: Run Experiments to Resolve POC Gaps
+
+After the audit subagent returns, review the POC Gaps section. If there are gaps that can be resolved with quick experiments (API calls, data inspection, dependency checks), propose them to the user before writing the audit.
+
+**How to propose experiments:**
+
+Present the user with a summary like:
+
+> The audit found N assumptions that haven't been verified. I can run experiments to check them now:
+>
+> 1. **[Assumption]** - [What the experiment does, 1 sentence]. (~5 min)
+> 2. **[Assumption]** - [What the experiment does, 1 sentence]. (~5 min)
+> 3. **[Assumption]** - [What the experiment does, 1 sentence]. (needs live data, can't run now)
+>
+> Want me to run 1 and 2 now? #3 needs [specific condition] so we'd note it as pre-work.
+
+**If the user says yes:**
+
+Launch experiment subagents (general-purpose, NOT Explore) in parallel for each approved experiment. Give each subagent a complete prompt that includes:
+- The assumption to test
+- What to do (fetch, parse, check, etc.)
+- The experiment folder path to use
+- The project's experiment rules (below)
+
+**Experiment folder structure and rules:**
+
+Every experiment MUST live in `experiments/` at the project root. Each gets its own subfolder:
+
+```
+experiments/
+  YYYY-MM-DD-descriptive-name/
+    explore.ts (or explore.py, explore.sh, etc.)   # The experiment script
+    raw/                                             # Cached API/HTTP responses
+      response_1.json
+      response_2.html
+    FINDINGS.md                                      # What was tested, what was found
+```
+
+Rules for experiment subagents:
+- **Folder:** `experiments/YYYY-MM-DD-short-description/` (e.g., `experiments/2026-04-04-check-channel-delivery/`)
+- **Cache raw responses:** Every API call or HTTP fetch saves its raw response to `raw/` BEFORE parsing. Never re-fetch what's already cached. This lets us re-analyze without hitting endpoints again.
+- **Sleep between requests:** Minimum 2 seconds between calls to the same host.
+- **Stop on errors:** If an endpoint returns 429, 403, or 5xx, stop immediately. Log it and move on.
+- **Write FINDINGS.md:** Summarize what was tested, what was found, and what it means for the plan. Include the key data points, not just "it worked."
+- **Return structured results:** The subagent must return: assumption tested, result (confirmed/denied/partial), specific findings, and impact on the plan.
+- **Check for project-specific experiment rules:** If the repo has experiment conventions in CLAUDE.md or a playbook (e.g., browser UA requirements, rate limit rules, caching conventions), follow those too.
+
+**After experiments complete:**
+
+1. Read each experiment's FINDINGS.md to confirm results.
+2. Update the plan's POC Gaps table with results and a link to the experiment:
+   ```
+   | 1 | API returns expected fields | Confirmed. See `experiments/YYYY-MM-DD-name/FINDINGS.md` | quick |
+   ```
+3. If an experiment resolves a blocking question, update the Open Questions table too.
+4. If findings change the plan approach (e.g., a dependency is missing, an API field doesn't exist), update the relevant plan phase and add a Revision Log entry explaining what changed and why, linking to the experiment:
+   ```
+   | YYYY-MM-DD | Phase N updated: [what changed]. See experiments/YYYY-MM-DD-name/FINDINGS.md |
+   ```
+5. Re-evaluate the verdict based on combined audit + experiment results.
+
+**If the user says no or skip:**
+
+Record the unverified assumptions in the POC Gaps table as "Not verified" and note them in Pre-Work.
+
+**When NOT to propose experiments:**
+- All POC gaps are trivially verifiable during execution (e.g., "does this method accept the right args?")
+- All gaps require conditions that can't be met now (e.g., needs a live event, third-party system is down, needs production data)
+- The Explore subagent already verified the assumption by reading code/data
+
 ### Step 3: Process Audit Results and Write the Readiness Audit
 
-When the subagent returns, process its results. Apply any recommended plan changes (add missing phases, fix references, add acceptance criteria). Then write the audit to the plan file.
+When the subagent returns (and any experiments complete), process all results. Apply any recommended plan changes (add missing phases, fix references, add acceptance criteria). Then write the audit to the plan file.
 
 Append a `## Readiness Audit` section to the plan file. If a previous audit already exists, **update it in place**: add a new row to the Audit Log, update the Verdict and all sections below to reflect current state. Do NOT delete the Audit Log history.
 
