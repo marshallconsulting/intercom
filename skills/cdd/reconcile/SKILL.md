@@ -85,6 +85,16 @@ Classify each finding:
 | **Inaccurate** | Spec describes behavior incorrectly (wrong method signature, wrong message format, etc.) | Fix spec |
 | **Cosmetic** | Minor wording that could be clearer but isn't wrong | Note but don't block |
 
+### Spec Altitude Rules (apply when writing edits)
+
+Specs describe the domain, not the implementation. When writing proposed edits, stay at the right altitude:
+
+**Include:** Domain rules, design decisions with reasoning, non-obvious architecture choices, what each piece IS and WHY it exists.
+
+**Exclude:** Method signatures, file paths, exact type definitions, transport-level details, tool-name lists that can be derived from code. If an agent can derive it from reading the code, it doesn't belong in the spec.
+
+**Test:** Would removing this detail from the spec cause an agent to make a wrong decision? If no, leave it out.
+
 ### Step 4: Generate the Report
 
 Output a structured reconciliation report to the user:
