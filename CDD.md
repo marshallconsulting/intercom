@@ -109,6 +109,8 @@ An **idea** is a raw spark, kept in `workflow/ideas/` (gitignored). When it's wo
 You can layer on as much or as little process as you need:
 
 - **Sandbox** (`specs/sandbox/` or a sandbox in proposals). Sketch ideas before they're ready to be proposals. Half-baked is fine. Not everything in sandbox becomes a proposal, and that's the point.
+- **Draft** (`/create-proposal`). Turn a GitHub issue or rough description into a structured proposal with codebase context baked in.
+- **Refine** (`/refine-proposal`). Pressure-test a draft proposal before accepting it: surface missing decisions, ambiguities, and assumptions while they're still cheap to fix.
 - **Accept** (`workflow/proposals/accepted/`). When a proposal is approved, move it to `accepted/` with a date prefix. This creates a permanent decision record. The `/accept-proposal` skill automates this and generates a plan from the accepted proposal.
 - **Audit** (`/audit-plan`). Before execution, an agent verifies the plan is ready: dependencies exist, test data is sufficient, open questions are resolved.
 - **Execute** (`/execute-plan`). An agent picks up the plan, works in a git worktree, implements each phase, runs tests, and opens a PR.
@@ -120,7 +122,7 @@ None of these are required. For a quick bug fix, just write code on a branch and
 ### What the Full Pipeline Looks Like
 
 ```
-Big features:  propose -> accept -> audit -> execute -> reconcile -> merge
+Big features:  draft -> refine -> accept -> audit -> execute -> reconcile -> merge
 Ad-hoc work:   hack on branch -> reconcile -> merge
 ```
 
@@ -234,10 +236,17 @@ These automate the core CDD workflow:
 
 | Skill | Purpose | Input | Output |
 |-------|---------|-------|--------|
+| `/create-proposal` | Draft a proposal from a GitHub issue with codebase context | Issue URL | Proposal in `workflow/proposals/` |
+| `/refine-proposal` | Pressure-test a draft: surface gaps, missing decisions, ambiguities | Proposal file | Updated proposal with answered questions |
 | `/accept-proposal` | Approve a proposal, survey codebase, write execution plan | Proposal file | Accepted proposal + plan in `workflow/plans/` |
 | `/audit-plan` | Verify plan readiness: deps, data, open questions, POC gaps | Plan file | Readiness audit appended to plan |
 | `/execute-plan` | Implement a plan in a worktree: code, test, spec update, PR | Plan file | Branch with code + PR |
+| `/code-review` | Review the current branch against `playbook/code-review.md` | Branch (auto-detected) | Review notes |
 | `/reconcile` | Diff branch vs specs and playbook, fix drift and capture new patterns | Branch (auto-detected) | Spec + playbook edits committed |
+| `/update-status` | Refresh `_status.md` files to reflect current implementation state | Specs + code | Updated status checkboxes |
+| `/bootstrap-specs` | Survey an existing codebase and generate initial CDD specs | Codebase | Spec files in `specs/` |
+| `/import-transcript` | Clean a raw call transcript and write it to `transcripts/` | Raw transcript | Cleaned transcript |
+| `/archive-transcripts` | Move older transcripts into weekly archive folders | `transcripts/` | Weekly archive folders with summaries |
 | `/mutate` | Pull traits from one artifact onto another (theirs/ours) | Two file paths | Rewritten ours file |
 | `/nightshift` | Batch-execute all queued plans overnight as stacked PRs | Plans in `workflow/plans/` | Stack of PRs for morning review |
 
