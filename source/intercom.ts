@@ -7,6 +7,8 @@
  * Messages arrive as <channel> tags, just like Telegram or Discord messages.
  *
  * Config: Set INTERCOM_AGENT_ID (or CLAUDE_AGENT_ID) env var to identify this agent.
+ *         A launcher that owns the session (cly) sets INTERCOM_AGENT_ID_OVERRIDE,
+ *         which beats a .mcp.json that pins an id. See AGENT_ID below.
  * Storage: ~/.claude/intercom/<agent-id>/inbox/ for pending messages
  *
  * https://github.com/marshallconsulting/intercom
@@ -32,7 +34,23 @@ import {
 
 const INTERCOM_DIR =
   process.env.INTERCOM_DIR || join(homedir(), '.claude', 'intercom')
+// Identity, most specific first.
+//
+// INTERCOM_AGENT_ID_OVERRIDE exists because of an asymmetry in how Claude Code
+// starts an MCP server: it merges the server's `env` block from .mcp.json OVER
+// the inherited environment. So a repo that pins INTERCOM_AGENT_ID cannot be
+// overridden by exporting that same variable — the config always wins, which is
+// usually right, since the repo is the thing that knows what its agent is
+// called.
+//
+// It stops being right when something else owns the session. `cly` runs each
+// agent in a named tmux session, and that name is what you type to attach to it
+// and what another agent should type to message it; the repo's default id would
+// hide it under a name nobody typed. This variable is the escape hatch, and it
+// works precisely because no .mcp.json sets it: a launcher that owns the
+// session sets it in the environment, and it beats the config.
 const AGENT_ID =
+  process.env.INTERCOM_AGENT_ID_OVERRIDE ||
   process.env.INTERCOM_AGENT_ID ||
   process.env.CLAUDE_AGENT_ID ||
   process.env.AGENT_ID ||

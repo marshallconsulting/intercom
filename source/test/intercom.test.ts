@@ -37,9 +37,19 @@ function spawnServer(
   readAllOutput: (timeoutMs?: number) => Promise<string>
   kill: () => void
 } {
+  // Both of these outrank CLAUDE_AGENT_ID in the server's precedence list, so
+  // one inherited from the developer's shell would silently rename every agent
+  // in every test. That is not hypothetical: cly sets the override to name the
+  // agent in its session, so `bun test` run from inside a cly session would
+  // hand every server the same id and the routing tests would fail on the
+  // suite's own environment rather than on the code.
+  const env: Record<string, string | undefined> = { ...process.env }
+  delete env.INTERCOM_AGENT_ID_OVERRIDE
+  delete env.INTERCOM_AGENT_ID
+
   const proc = Bun.spawn(['bun', 'run', SERVER_PATH], {
     env: {
-      ...process.env,
+      ...env,
       INTERCOM_DIR: intercomDir,
       CLAUDE_AGENT_ID: agentId,
     },
@@ -678,5 +688,81 @@ describe('send offline warning', () => {
 
     expect(text).toBe('Sent to alive-agent')
     expect(text).not.toContain('offline')
+  })
+})
+
+describe('agent id precedence', () => {
+  let tmpDir: string
+
+  beforeAll(async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), 'intercom-test-'))
+  })
+
+  afterAll(async () => {
+    await rm(tmpDir, { recursive: true, force: true })
+  })
+
+  /**
+   * Start a server with an exact environment and report which agent ids it
+   * registered. Registration is the observable side of AGENT_ID: the server
+   * creates ~/.claude/intercom/<id>/ before it even connects its transport.
+   *
+   * Deliberately not spawnServer(), which pins CLAUDE_AGENT_ID — the point here
+   * is which variable wins, so each one has to be set explicitly and every
+   * other one cleared.
+   */
+  async function idsRegisteredWith(
+    dir: string,
+    vars: Record<string, string>,
+  ): Promise<string[]> {
+    const env: Record<string, string | undefined> = { ...process.env }
+    for (const key of [
+      'INTERCOM_AGENT_ID_OVERRIDE',
+      'INTERCOM_AGENT_ID',
+      'CLAUDE_AGENT_ID',
+      'AGENT_ID',
+    ]) {
+      delete env[key]
+    }
+    const proc = Bun.spawn(['bun', 'run', SERVER_PATH], {
+      env: { ...env, ...vars, INTERCOM_DIR: dir },
+      stdin: 'pipe',
+      stdout: 'pipe',
+      stderr: 'pipe',
+    })
+    for (let i = 0; i < 50 && (await readdir(dir)).length === 0; i++) {
+      await Bun.sleep(100)
+    }
+    proc.kill()
+    return (await readdir(dir)).sort()
+  }
+
+  test('a launcher override beats an id pinned in .mcp.json', async () => {
+    const dir = join(tmpDir, 'override')
+    await mkdir(dir, { recursive: true })
+
+    // Exactly what Claude Code hands the server for a cly session in a repo
+    // whose .mcp.json pins an id: both variables present at once. The config
+    // value reaches the server no matter what the launcher exports, because
+    // Claude Code merges the `env` block over the inherited environment — so
+    // the override has to win on precedence here, not on absence there.
+    const ids = await idsRegisteredWith(dir, {
+      INTERCOM_AGENT_ID: 'repo-pinned-id',
+      INTERCOM_AGENT_ID_OVERRIDE: 'cly-session-name',
+    })
+
+    expect(ids).toEqual(['cly-session-name'])
+  })
+
+  test('without an override the configured id still wins', async () => {
+    const dir = join(tmpDir, 'no-override')
+    await mkdir(dir, { recursive: true })
+
+    const ids = await idsRegisteredWith(dir, {
+      INTERCOM_AGENT_ID: 'repo-pinned-id',
+      CLAUDE_AGENT_ID: 'legacy-id',
+    })
+
+    expect(ids).toEqual(['repo-pinned-id'])
   })
 })

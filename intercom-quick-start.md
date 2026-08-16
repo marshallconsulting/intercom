@@ -69,6 +69,25 @@ The agent ID determines the inbox directory (`~/.claude/intercom/<agent-id>/inbo
 
 Then you can just launch with `claude --dangerously-load-development-channels server:intercom` and the agent ID is set automatically.
 
+### Letting a launcher name the agent
+
+A value in `.mcp.json` wins over the same variable exported into the shell:
+Claude Code merges the `env` block over the inherited environment. So once a
+repo pins `INTERCOM_AGENT_ID`, `export INTERCOM_AGENT_ID=…` before launching
+does nothing.
+
+That's usually what you want. When it isn't — when a launcher, not the repo,
+decides what this agent is called — set `INTERCOM_AGENT_ID_OVERRIDE` instead. No
+`.mcp.json` sets it, so it wins:
+
+```bash
+INTERCOM_AGENT_ID_OVERRIDE=nightly-builder claude --dangerously-load-development-channels server:intercom
+```
+
+[cly](https://github.com/marshallconsulting/cly) does this for every session it
+starts, so an agent's intercom id is the same name you type to attach to its
+tmux session.
+
 ### Use
 
 Once configured, every Claude Code session has these tools:

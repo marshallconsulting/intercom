@@ -70,6 +70,13 @@ claude
 
 Without this, the agent defaults to `"unknown"`, which is fine for casual use.
 
+Once a project pins an id in its `.mcp.json`, that value wins over the exported
+one — Claude Code merges an MCP server's `env` block over the inherited
+environment. To let a launcher name the agent instead, set
+`INTERCOM_AGENT_ID_OVERRIDE`, which takes precedence over everything and which
+no `.mcp.json` sets. [cly](https://github.com/marshallconsulting/cly) uses it to
+give each tmux session an agent id matching the session's name.
+
 ### 3. Test it
 
 Launch two agents in separate terminals with different `INTERCOM_AGENT_ID` values. In Agent A:
