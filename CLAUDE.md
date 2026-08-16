@@ -100,6 +100,7 @@ cd source && bun test
 ## Key Concepts
 
 - **Agent ID** — Unique identifier (e.g., `team-cto`, `project-a-builder`). Set via `INTERCOM_AGENT_ID` env var (also accepts `CLAUDE_AGENT_ID`).
+- **Agent ID override** — `INTERCOM_AGENT_ID_OVERRIDE` beats all of the above. It exists because Claude Code merges an MCP server's `env` block from `.mcp.json` *over* the inherited environment, so a repo that pins `INTERCOM_AGENT_ID` cannot be overridden by exporting that same variable. That's the right default — the repo names its own agent — but it's wrong when something else owns the session. `cly` runs each agent in a named tmux session and sets this so the name you type to attach is the name you type to message. Nothing sets it in any `.mcp.json`, which is what makes it work.
 - **Inbox** — Per-agent directory at `~/.claude/intercom/<agent-id>/inbox/`. Messages are JSON files.
 - **Registry** — Agent writes `info.json` on startup. `list_agents` reads all registrations.
 - **Channel delivery** — Messages arrive as MCP channel notifications, rendered as `<channel>` tags.
